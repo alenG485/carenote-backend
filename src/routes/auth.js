@@ -79,4 +79,18 @@ router.post('/resend-verification', userValidation.resendVerification, authContr
  */
 router.post('/logout', authenticate, authController.logout);
 
+/**
+ * @route   GET /api/auth/verify-invitation
+ * @desc    Verify invitation token
+ * @access  Public
+ */
+router.get('/verify-invitation', authController.verifyInvitation);
+
+/**
+ * @route   POST /api/auth/accept-invitation
+ * @desc    Accept invitation and set password
+ * @access  Public
+ */
+router.post('/accept-invitation', authController.acceptInvitation);
+
 module.exports = router; 

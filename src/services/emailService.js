@@ -377,6 +377,150 @@ class EmailService {
       throw error;
     }
   }
+
+  /**
+   * Generate invitation email template
+   */
+  generateInvitationEmailTemplate(invitationData) {
+    const { email, name, companyName, invitationToken, invitedBy } = invitationData;
+    const invitationLink = `${this.frontendUrl}/accept-invitation?token=${invitationToken}`;
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Invitation til ${companyName} - ${this.companyName}</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { text-align: center; padding: 30px 0; border-bottom: 2px solid #00d084; }
+          .logo { font-size: 32px; font-weight: 300; color: #333; }
+          .logo span { font-weight: 600; color: #00d084; }
+          .content { padding: 40px 0; }
+          .button { display: inline-block; padding: 14px 28px; background-color: #00d084; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 20px 0; }
+          .button:hover { background-color: #00b570; }
+          .footer { border-top: 1px solid #eee; padding: 20px 0; font-size: 14px; color: #666; text-align: center; }
+          .info-box { background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <div class="logo">Care<span>Note</span></div>
+          </div>
+          
+          <div class="content">
+            <h1>Invitation til ${companyName}</h1>
+            
+            <p>Hej ${name},</p>
+            
+            <p>Du er blevet inviteret til at deltage i ${companyName} på ${this.companyName} platformen af ${invitedBy}.</p>
+            
+            <p>${this.companyName} er en intelligent journalføringsplatform, der hjælper sundhedspersonale med at spare tid på dokumentation og forbedre patientplejen.</p>
+            
+            <p>Klik på knappen nedenfor for at acceptere invitationen og oprette din konto:</p>
+            
+            <div style="text-align: center;">
+              <a href="${invitationLink}" class="button">Accepter invitation</a>
+            </div>
+            
+            <div class="info-box">
+              <h3>Hvad får du adgang til?</h3>
+              <ul>
+                <li>Intelligent journalføring med AI-assistance</li>
+                <li>Automatisk strukturering af kliniske notater</li>
+                <li>Tidsbesparelse på op til 90% ved dokumentation</li>
+                <li>Sikker håndtering af patientdata</li>
+                <li>Samarbejde med dit team</li>
+              </ul>
+            </div>
+            
+            <p>Hvis du har spørgsmål eller brug for hjælp, så tøv ikke med at kontakte vores support på <a href="mailto:support@carenote.dk">support@carenote.dk</a>.</p>
+            
+            <p>Med venlig hilsen,<br>
+            ${this.companyName} teamet</p>
+            
+            <p style="font-size: 14px; color: #666;">
+              Hvis du ikke forventede denne invitation, kan du ignorere denne e-mail.
+            </p>
+          </div>
+          
+          <div class="footer">
+            <p>&copy; ${new Date().getFullYear()} ${this.companyName}. Alle rettigheder forbeholdes.</p>
+            <p>Denne e-mail blev sendt til ${email}</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const text = `
+      Invitation til ${companyName} - ${this.companyName}
+      
+      Hej ${name},
+      
+      Du er blevet inviteret til at deltage i ${companyName} på ${this.companyName} platformen af ${invitedBy}.
+      
+      ${this.companyName} er en intelligent journalføringsplatform, der hjælper sundhedspersonale med at spare tid på dokumentation og forbedre patientplejen.
+      
+      Besøg dette link for at acceptere invitationen og oprette din konto:
+      ${invitationLink}
+      
+      Hvad får du adgang til?
+      - Intelligent journalføring med AI-assistance
+      - Automatisk strukturering af kliniske notater
+      - Tidsbesparelse på op til 90% ved dokumentation
+      - Sikker håndtering af patientdata
+      - Samarbejde med dit team
+      
+      Hvis du har spørgsmål eller brug for hjælp, så kontakt os på support@carenote.dk.
+      
+      Med venlig hilsen,
+      ${this.companyName} teamet
+      
+      Hvis du ikke forventede denne invitation, kan du ignorere denne e-mail.
+    `;
+
+    return { html, text };
+  }
+
+  /**
+   * Send invitation email
+   */
+  async sendInvitationEmail(invitationData) {
+    try {
+      if (!this.isConfigured()) {
+        this.logger.error('Resend API key not configured');
+        throw new Error('Email service not configured');
+      }
+
+      const { html, text } = this.generateInvitationEmailTemplate(invitationData);
+
+      const result = await this.resend.emails.send({
+        from: this.fromEmail,
+        to: invitationData.email,
+        subject: `Invitation til ${invitationData.companyName} - ${this.companyName}`,
+        html,
+        text,
+        tags: [
+          { name: 'category', value: 'invitation' },
+          { name: 'user_type', value: 'invited_user' }
+        ]
+      });
+
+      this.logger.info('Invitation email sent successfully', { 
+        email: invitationData.email, 
+        messageId: result.data?.id 
+      });
+
+      return { success: true, messageId: result.data?.id };
+
+    } catch (error) {
+      throw error;
+    }
+  }
 }
 
 module.exports = new EmailService(); 

@@ -519,6 +519,133 @@ const logout = async (req, res) => {
   }
 };
 
+/**
+ * Verify invitation token
+ * GET /api/auth/verify-invitation
+ */
+const verifyInvitation = async (req, res) => {
+  try {
+    const { token } = req.query;
+
+    if (!token) {
+      return errorResponse(res, 'Invitation token is required', 400);
+    }
+
+    // Find user with this invitation token
+    const user = await User.findOne({ invitation_token: token });
+    if (!user) {
+      return errorResponse(res, 'Invalid or expired invitation token', 400);
+    }
+
+    // Check if invitation is still valid (not expired)
+    const invitationAge = Date.now() - user.created_at.getTime();
+    const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
+    if (invitationAge > maxAge) {
+      return errorResponse(res, 'Invitation has expired', 400);
+    }
+
+    // Get company info
+    const company = await Company.findById(user.company_id);
+    if (!company) {
+      return errorResponse(res, 'Company not found', 404);
+    }
+
+    const invitationData = {
+      email: user.email,
+      name: user.name,
+      specialty: user.specialty,
+      phone: user.phone,
+      company: {
+        id: company._id,
+        name: company.name
+      }
+    };
+
+    return successResponse(res, invitationData, 'Invitation verified successfully');
+  } catch (error) {
+    console.error('Verify invitation error:', error);
+    return errorResponse(res, 'Failed to verify invitation', 500);
+  }
+};
+
+/**
+ * Accept invitation and set password
+ * POST /api/auth/accept-invitation
+ */
+const acceptInvitation = async (req, res) => {
+  try {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+      return errorResponse(res, 'Token and password are required', 400);
+    }
+
+    if (password.length < 6) {
+      return errorResponse(res, 'Password must be at least 6 characters', 400);
+    }
+
+    // Find user with this invitation token
+    const user = await User.findOne({ invitation_token: token });
+    if (!user) {
+      return errorResponse(res, 'Invalid or expired invitation token', 400);
+    }
+
+    // Check if invitation is still valid
+    const invitationAge = Date.now() - user.created_at.getTime();
+    const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
+    if (invitationAge > maxAge) {
+      return errorResponse(res, 'Invitation has expired', 400);
+    }
+
+    // Update user password and activate account
+    user.password = password;
+    user.is_active = true;
+    user.email_verified = true;
+    user.invitation_token = null; // Clear the invitation token
+    await user.save();
+
+    // Get company info
+    const company = await Company.findById(user.company_id);
+    if (!company) {
+      return errorResponse(res, 'Company not found', 404);
+    }
+
+    // Generate tokens
+    const { accessToken, refreshToken } = generateTokens(user._id);
+
+    // Remove password and sensitive data from response
+    const userResponse = user.toJSON();
+    delete userResponse.password;
+    delete userResponse.verification_token;
+    delete userResponse.reset_password_token;
+    delete userResponse.invitation_token;
+
+    const response = {
+      user: userResponse,
+      tokens: {
+        access: accessToken,
+        refresh: refreshToken
+      },
+      message: 'Account activated successfully'
+    };
+
+    // Include company info
+    if (company) {
+      response.company = {
+        id: company._id,
+        name: company.name,
+        max_users: company.max_users,
+        current_user_count: company.current_user_count
+      };
+    }
+
+    return successResponse(res, response, 'Invitation accepted successfully');
+  } catch (error) {
+    console.error('Accept invitation error:', error);
+    return errorResponse(res, 'Failed to accept invitation', 500);
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -529,5 +656,7 @@ module.exports = {
   resetPassword,
   verifyEmail,
   resendVerification,
-  logout
+  logout,
+  verifyInvitation,
+  acceptInvitation
 }; 

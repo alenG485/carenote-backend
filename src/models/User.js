@@ -60,6 +60,29 @@ const userSchema = new mongoose.Schema({
     default: null
   },
   
+  // Company Admin status (for backward compatibility)
+  is_company_admin: {
+    type: Boolean,
+    default: false
+  },
+  
+  // User status
+  is_active: {
+    type: Boolean,
+    default: true
+  },
+  
+  // Invitation fields
+  invitation_token: {
+    type: String,
+    default: null
+  },
+  invited_by: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  
   // Subscription
   subscription_id: {
     type: mongoose.Schema.Types.ObjectId,
@@ -122,6 +145,16 @@ userSchema.pre('save', async function(next) {
 userSchema.pre('save', function(next) {
   if (this.email === process.env.SUPER_ADMIN_EMAIL) {
     this.role = 'super_admin';
+  }
+  next();
+});
+
+// Sync role and is_company_admin fields
+userSchema.pre('save', function(next) {
+  if (this.role === 'company_admin') {
+    this.is_company_admin = true;
+  } else if (this.role === 'user') {
+    this.is_company_admin = false;
   }
   next();
 });
