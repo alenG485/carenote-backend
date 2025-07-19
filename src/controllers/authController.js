@@ -225,51 +225,6 @@ const login = async (req, res) => {
 };
 
 /**
- * Refresh access token
- * POST /api/auth/refresh
- */
-const refreshToken = async (req, res) => {
-  try {
-    const { refresh_token } = req.body;
-
-    if (!refresh_token) {
-      return errorResponse(res, 'Refresh token is required', 400);
-    }
-
-    try {
-      // Verify refresh token
-      const decoded = jwt.verify(refresh_token, process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET);
-      
-      // Get user
-      const user = await User.findById(decoded.userId).select('-password');
-      if (!user) {
-        return errorResponse(res, 'User not found', 404);
-      }
-
-          // Check if user has active subscription (activation is now based on subscription)
-    // This will be handled by subscription middleware or checks
-
-      // Generate new tokens
-      const { accessToken, refreshToken: newRefreshToken } = generateTokens(user._id);
-
-      return successResponse(res, {
-        tokens: {
-          access: accessToken,
-          refresh: newRefreshToken
-        }
-      }, 'Token refreshed successfully');
-
-    } catch (jwtError) {
-      return errorResponse(res, 'Invalid refresh token', 401);
-    }
-
-  } catch (error) {
-    console.error('Refresh token error:', error);
-    return errorResponse(res, 'Failed to refresh token', 500);
-  }
-};
-
-/**
  * Get current user profile
  * GET /api/auth/me
  */
@@ -382,15 +337,6 @@ const forgotPassword = async (req, res) => {
     }
 
     const user = await User.findOne({ email });
-    if (!user) {
-      // Don't reveal if email exists for security
-      return successResponse(res, null, 'If the email exists, a reset link will be sent');
-    }
-
-    // Check if user is active
-    if (!user.is_active) {
-      return successResponse(res, null, 'If the email exists, a reset link will be sent');
-    }
 
     // Generate secure reset token
     const resetToken = crypto.randomBytes(32).toString('hex');
@@ -576,7 +522,6 @@ const logout = async (req, res) => {
 module.exports = {
   register,
   login,
-  refreshToken,
   getProfile,
   updateProfile,
   changePassword,

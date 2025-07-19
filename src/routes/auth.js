@@ -24,13 +24,6 @@ router.post('/register', userValidation.register, authController.register);
 router.post('/login', userValidation.login, authController.login);
 
 /**
- * @route   POST /api/auth/refresh
- * @desc    Refresh access token
- * @access  Public
- */
-router.post('/refresh', authController.refreshToken);
-
-/**
  * @route   GET /api/auth/me
  * @desc    Get current user profile
  * @access  Private

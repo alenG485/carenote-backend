@@ -295,7 +295,7 @@ class EmailService {
         throw new Error('Email service not configured');
       }
 
-      const { name, email, resetToken } = userData;
+      const { email } = userData;
       const { html, text } = this.generatePasswordResetTemplate(userData);
 
       const result = await this.resend.emails.send({
