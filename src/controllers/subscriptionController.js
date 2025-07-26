@@ -1,17 +1,13 @@
 const { validationResult } = require('express-validator');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const Subscription = require('../models/Subscription');
-const Company = require('../models/Company');
 const User = require('../models/User');
 const { successResponse, errorResponse } = require('../utils/responses');
 
 /**
  * Subscription Controller
- * Handles subscription management with Stripe integration
- * Manages both individual and company subscriptions
+ * Handles manual subscription management
+ * No Stripe integration - all billing is manual
  */
-
-
 
 /**
  * Get current user's subscription
@@ -21,7 +17,7 @@ const getCurrentSubscription = async (req, res) => {
   try {
     const subscription = await Subscription.findOne({
       user_id: req.user._id
-    });
+    }).populate('user_id', 'name email');
 
     if (!subscription) {
       return errorResponse(res, 'No subscription found', 404);
@@ -45,7 +41,7 @@ const createSubscription = async (req, res) => {
       return errorResponse(res, 'Validation failed', 400, errors.array());
     }
 
-    const { stripe_price_id, billing_interval } = req.body;
+    const { plan_name, billing_amount, billing_interval, trial_days } = req.body;
 
     // Check if user already has subscription
     const existingSubscription = await Subscription.findOne({ user_id: req.user._id });
@@ -54,86 +50,37 @@ const createSubscription = async (req, res) => {
       return errorResponse(res, 'Subscription already exists', 400);
     }
 
-    // Create Stripe customer
-    const customer = await stripe.customers.create({
-      email: req.user.email,
-      name: req.user.name,
-      metadata: {
-        user_id: req.user._id.toString(),
-        stripe_price_id,
-        billing_interval
-      }
-    });
+    // Calculate trial end date
+    const trialDays = trial_days || 15;
+    const trialEnd = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
 
     // Create subscription in database
     const subscription = new Subscription({
       user_id: req.user._id,
-      stripe_customer_id: customer.id,
-      stripe_price_id,
-      status: 'not_started',
-      is_trial: false
+      plan_name: plan_name || 'individual',
+      status: 'active',
+      is_trial: true,
+      current_period_start: new Date(),
+      current_period_end: trialEnd,
+      billing_amount: billing_amount || 599,
+      billing_currency: 'DKK',
+      billing_interval: billing_interval || 'monthly'
     });
 
     const savedSubscription = await subscription.save();
 
+    // Update user with subscription reference
+    await User.findByIdAndUpdate(req.user._id, {
+      subscription_id: savedSubscription._id
+    });
+
     return successResponse(res, {
-      subscription: savedSubscription,
-      stripe_customer_id: customer.id
+      subscription: savedSubscription
     }, 'Subscription created successfully', 201);
 
   } catch (error) {
     console.error('Create subscription error:', error);
     return errorResponse(res, error.message || 'Failed to create subscription', 500);
-  }
-};
-
-/**
- * Create Stripe checkout session
- * POST /api/subscriptions/:id/checkout
- */
-const createCheckoutSession = async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    const subscription = await Subscription.findById(id);
-    if (!subscription) {
-      return errorResponse(res, 'Subscription not found', 404);
-    }
-
-    // Check if user owns this subscription
-    if (subscription.user_id && subscription.user_id.toString() !== req.user._id.toString()) {
-      return errorResponse(res, 'Access denied', 403);
-    }
-
-    if (subscription.company_id && req.user.company_id?.toString() !== subscription.company_id.toString()) {
-      return errorResponse(res, 'Access denied', 403);
-    }
-
-    // Create Stripe checkout session
-    const session = await stripe.checkout.sessions.create({
-      customer: subscription.stripe_customer_id,
-      payment_method_types: ['card'],
-      line_items: [{
-        price: subscription.stripe_price_id,
-        quantity: 1
-      }],
-      mode: 'subscription',
-      success_url: `${process.env.FRONTEND_URL}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.FRONTEND_URL}/subscription/cancel`,
-      metadata: {
-        subscription_id: subscription._id.toString(),
-        user_id: req.user._id.toString()
-      }
-    });
-
-    return successResponse(res, {
-      checkout_url: session.url,
-      session_id: session.id
-    }, 'Checkout session created successfully');
-
-  } catch (error) {
-    console.error('Create checkout session error:', error);
-    return errorResponse(res, error.message || 'Failed to create checkout session', 500);
   }
 };
 
@@ -149,50 +96,34 @@ const updateSubscription = async (req, res) => {
     }
 
     const { id } = req.params;
-    const { plan_name, billing_interval } = req.body;
+    const { plan_name, billing_amount, billing_interval, status, notes } = req.body;
 
     const subscription = await Subscription.findById(id);
     if (!subscription) {
       return errorResponse(res, 'Subscription not found', 404);
     }
 
-    // Check access permissions
-    if (subscription.user_id && subscription.user_id.toString() !== req.user._id.toString()) {
-      return errorResponse(res, 'Access denied', 403);
+    // Check if user owns this subscription or is admin
+    if (subscription.user_id.toString() !== req.user._id.toString() && req.user.role !== 'super_admin') {
+      return errorResponse(res, 'Not authorized to update this subscription', 403);
     }
 
-    if (subscription.company_id && req.user.company_id?.toString() !== subscription.company_id.toString()) {
-      return errorResponse(res, 'Access denied', 403);
-    }
-
-    // Get new plan details if plan is changing
-    if (plan_name && plan_name !== subscription.plan_name) {
-      const plans = Subscription.getPlans();
-      const newPlan = plans.find(plan => plan.name === plan_name);
-      
-      if (!newPlan) {
-        return errorResponse(res, 'Invalid plan selected', 400);
-      }
-
-      subscription.plan_name = plan_name;
-      subscription.plan_type = newPlan.type;
-      subscription.price_monthly = newPlan.price_monthly;
-      subscription.price_yearly = newPlan.price_yearly;
-      subscription.max_users = newPlan.max_users;
-      subscription.features = newPlan.features;
-    }
-
-    if (billing_interval) {
-      subscription.billing_interval = billing_interval;
-    }
+    // Update fields
+    if (plan_name) subscription.plan_name = plan_name;
+    if (billing_amount) subscription.billing_amount = billing_amount;
+    if (billing_interval) subscription.billing_interval = billing_interval;
+    if (status) subscription.status = status;
+    if (notes !== undefined) subscription.notes = notes;
 
     const updatedSubscription = await subscription.save();
 
-    return successResponse(res, { subscription: updatedSubscription }, 'Subscription updated successfully');
+    return successResponse(res, {
+      subscription: updatedSubscription
+    }, 'Subscription updated successfully');
 
   } catch (error) {
     console.error('Update subscription error:', error);
-    return errorResponse(res, 'Failed to update subscription', 500);
+    return errorResponse(res, error.message || 'Failed to update subscription', 500);
   }
 };
 
@@ -203,38 +134,28 @@ const updateSubscription = async (req, res) => {
 const cancelSubscription = async (req, res) => {
   try {
     const { id } = req.params;
-    const { cancel_at_period_end = true } = req.body;
 
     const subscription = await Subscription.findById(id);
     if (!subscription) {
       return errorResponse(res, 'Subscription not found', 404);
     }
 
-    // Check access permissions
-    if (subscription.user_id && subscription.user_id.toString() !== req.user._id.toString()) {
-      return errorResponse(res, 'Access denied', 403);
+    // Check if user owns this subscription or is admin
+    if (subscription.user_id.toString() !== req.user._id.toString() && req.user.role !== 'super_admin') {
+      return errorResponse(res, 'Not authorized to cancel this subscription', 403);
     }
 
-    if (subscription.company_id && req.user.company_id?.toString() !== subscription.company_id.toString()) {
-      return errorResponse(res, 'Access denied', 403);
-    }
-
-    // Cancel in Stripe if subscription exists
-    if (subscription.stripe_subscription_id) {
-      await stripe.subscriptions.update(subscription.stripe_subscription_id, {
-        cancel_at_period_end: cancel_at_period_end
-      });
-    }
-
-    // Update subscription status
-    subscription.cancel(cancel_at_period_end);
+    // Cancel subscription
+    subscription.cancel(req.user._id);
     await subscription.save();
 
-    return successResponse(res, { subscription }, 'Subscription cancelled successfully');
+    return successResponse(res, {
+      subscription
+    }, 'Subscription cancelled successfully');
 
   } catch (error) {
     console.error('Cancel subscription error:', error);
-    return errorResponse(res, 'Failed to cancel subscription', 500);
+    return errorResponse(res, error.message || 'Failed to cancel subscription', 500);
   }
 };
 
@@ -251,179 +172,124 @@ const reactivateSubscription = async (req, res) => {
       return errorResponse(res, 'Subscription not found', 404);
     }
 
-    // Check access permissions
-    if (subscription.user_id && subscription.user_id.toString() !== req.user._id.toString()) {
-      return errorResponse(res, 'Access denied', 403);
-    }
-
-    if (subscription.company_id && req.user.company_id?.toString() !== subscription.company_id.toString()) {
-      return errorResponse(res, 'Access denied', 403);
-    }
-
-    // Reactivate in Stripe if subscription exists
-    if (subscription.stripe_subscription_id) {
-      await stripe.subscriptions.update(subscription.stripe_subscription_id, {
-        cancel_at_period_end: false
-      });
+    // Check if user owns this subscription or is admin
+    if (subscription.user_id.toString() !== req.user._id.toString() && req.user.role !== 'super_admin') {
+      return errorResponse(res, 'Not authorized to reactivate this subscription', 403);
     }
 
     // Reactivate subscription
     subscription.reactivate();
     await subscription.save();
 
-    return successResponse(res, { subscription }, 'Subscription reactivated successfully');
+    return successResponse(res, {
+      subscription
+    }, 'Subscription reactivated successfully');
 
   } catch (error) {
     console.error('Reactivate subscription error:', error);
-    return errorResponse(res, 'Failed to reactivate subscription', 500);
+    return errorResponse(res, error.message || 'Failed to reactivate subscription', 500);
   }
 };
 
 /**
- * Handle Stripe webhook
- * POST /api/subscriptions/webhook
+ * Extend subscription
+ * POST /api/subscriptions/:id/extend
  */
-const handleStripeWebhook = async (req, res) => {
+const extendSubscription = async (req, res) => {
   try {
-    const sig = req.headers['stripe-signature'];
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+    const { id } = req.params;
+    const { days } = req.body;
 
-    let event;
-    try {
-      event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
-    } catch (err) {
-      console.error('Webhook signature verification failed:', err.message);
-      return res.status(400).send(`Webhook Error: ${err.message}`);
+    const subscription = await Subscription.findById(id);
+    if (!subscription) {
+      return errorResponse(res, 'Subscription not found', 404);
     }
 
-    // Handle the event
-    switch (event.type) {
-      case 'customer.subscription.created':
-      case 'customer.subscription.updated':
-        await handleSubscriptionUpdate(event.data.object);
-        break;
-      
-      case 'customer.subscription.deleted':
-        await handleSubscriptionDeleted(event.data.object);
-        break;
-      
-      case 'invoice.payment_succeeded':
-        await handlePaymentSucceeded(event.data.object);
-        break;
-      
-      case 'invoice.payment_failed':
-        await handlePaymentFailed(event.data.object);
-        break;
-      
-      default:
-        console.log(`Unhandled event type ${event.type}`);
+    // Check if user owns this subscription or is admin
+    if (subscription.user_id.toString() !== req.user._id.toString() && req.user.role !== 'super_admin') {
+      return errorResponse(res, 'Not authorized to extend this subscription', 403);
     }
 
-    res.json({ received: true });
+    // Extend subscription
+    const extensionDays = days || 30;
+    subscription.extend(extensionDays);
+    await subscription.save();
+
+    return successResponse(res, {
+      subscription
+    }, `Subscription extended by ${extensionDays} days successfully`);
 
   } catch (error) {
-    console.error('Stripe webhook error:', error);
-    return res.status(500).json({ error: 'Webhook handler failed' });
+    console.error('Extend subscription error:', error);
+    return errorResponse(res, error.message || 'Failed to extend subscription', 500);
   }
 };
 
 /**
- * Helper function to handle subscription updates from Stripe
+ * Get all subscriptions (admin only)
+ * GET /api/subscriptions
  */
-const handleSubscriptionUpdate = async (stripeSubscription) => {
+const getAllSubscriptions = async (req, res) => {
   try {
-    const subscription = await Subscription.findOne({
-      stripe_customer_id: stripeSubscription.customer
-    });
-
-    if (subscription) {
-      subscription.stripe_subscription_id = stripeSubscription.id;
-      subscription.status = stripeSubscription.status;
-      subscription.current_period_start = new Date(stripeSubscription.current_period_start * 1000);
-      subscription.current_period_end = new Date(stripeSubscription.current_period_end * 1000);
-      subscription.cancel_at_period_end = stripeSubscription.cancel_at_period_end;
-      
-      if (stripeSubscription.canceled_at) {
-        subscription.canceled_at = new Date(stripeSubscription.canceled_at * 1000);
-      }
-
-      await subscription.save();
+    // Check if user is admin
+    if (req.user.role !== 'super_admin') {
+      return errorResponse(res, 'Not authorized to view all subscriptions', 403);
     }
+
+    const subscriptions = await Subscription.find()
+      .populate('user_id', 'name email')
+      .populate('cancelled_by', 'name email')
+      .sort({ created_at: -1 });
+
+    return successResponse(res, {
+      subscriptions,
+      count: subscriptions.length
+    }, 'All subscriptions retrieved successfully');
+
   } catch (error) {
-    console.error('Handle subscription update error:', error);
+    console.error('Get all subscriptions error:', error);
+    return errorResponse(res, 'Failed to get subscriptions', 500);
   }
 };
 
 /**
- * Helper function to handle subscription deletion from Stripe
+ * Get subscription by ID (admin only)
+ * GET /api/subscriptions/:id
  */
-const handleSubscriptionDeleted = async (stripeSubscription) => {
+const getSubscriptionById = async (req, res) => {
   try {
-    const subscription = await Subscription.findOne({
-      stripe_subscription_id: stripeSubscription.id
-    });
+    const { id } = req.params;
 
-    if (subscription) {
-      subscription.status = 'canceled';
-      subscription.canceled_at = new Date();
-      await subscription.save();
+    // Check if user is admin
+    if (req.user.role !== 'super_admin') {
+      return errorResponse(res, 'Not authorized to view this subscription', 403);
     }
-  } catch (error) {
-    console.error('Handle subscription deleted error:', error);
-  }
-};
 
-/**
- * Helper function to handle successful payments
- */
-const handlePaymentSucceeded = async (invoice) => {
-  try {
-    const subscription = await Subscription.findOne({
-      stripe_customer_id: invoice.customer
-    });
+    const subscription = await Subscription.findById(id)
+      .populate('user_id', 'name email')
+      .populate('cancelled_by', 'name email');
 
-    if (subscription) {
-      // Update payment method info if available
-      if (invoice.charge) {
-        const charge = await stripe.charges.retrieve(invoice.charge);
-        if (charge.payment_method_details?.card) {
-          subscription.payment_method_brand = charge.payment_method_details.card.brand;
-          subscription.payment_method_last4 = charge.payment_method_details.card.last4;
-        }
-      }
-
-      await subscription.save();
+    if (!subscription) {
+      return errorResponse(res, 'Subscription not found', 404);
     }
-  } catch (error) {
-    console.error('Handle payment succeeded error:', error);
-  }
-};
 
-/**
- * Helper function to handle failed payments
- */
-const handlePaymentFailed = async (invoice) => {
-  try {
-    const subscription = await Subscription.findOne({
-      stripe_customer_id: invoice.customer
-    });
+    return successResponse(res, {
+      subscription
+    }, 'Subscription retrieved successfully');
 
-    if (subscription) {
-      // Update subscription status if needed
-      // Could send notification email here
-      console.log(`Payment failed for subscription ${subscription._id}`);
-    }
   } catch (error) {
-    console.error('Handle payment failed error:', error);
+    console.error('Get subscription by ID error:', error);
+    return errorResponse(res, 'Failed to get subscription', 500);
   }
 };
 
 module.exports = {
   getCurrentSubscription,
   createSubscription,
-  createCheckoutSession,
   updateSubscription,
   cancelSubscription,
   reactivateSubscription,
-  handleStripeWebhook
+  extendSubscription,
+  getAllSubscriptions,
+  getSubscriptionById
 }; 

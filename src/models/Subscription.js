@@ -2,8 +2,8 @@ const mongoose = require('mongoose');
 
 /**
  * Subscription Model
- * Handles subscription management with Stripe integration
- * Simplified to focus on essential fields and trial management
+ * Handles subscription management with manual billing
+ * Simplified for manual subscription management
  */
 
 const subscriptionSchema = new mongoose.Schema({
@@ -14,51 +14,33 @@ const subscriptionSchema = new mongoose.Schema({
     required: true
   },
   
-  // Stripe Integration
-  stripe_customer_id: {
+  // Manual Subscription Details
+  plan_name: {
     type: String,
-    sparse: true
-  },
-  stripe_subscription_id: {
-    type: String,
-    sparse: true
-  },
-  stripe_price_id: {
-    type: String,
-    required: true
+    required: true,
+    enum: ['individual', 'clinic-small', 'clinic-medium', 'clinic-large']
   },
   
   // Subscription Status
   status: {
     type: String,
     enum: [
-      'not_started',
-      'incomplete',
-      'incomplete_expired',
-      'trialing',
       'active',
-      'past_due',
-      'canceled',
-      'unpaid',
-      'paused'
+      'inactive',
+      'expired',
+      'cancelled'
     ],
-    default: 'not_started'
+    default: 'active'
   },
-  
-
-  
-
-  
-
   
   // Billing Periods
   current_period_start: {
     type: Date,
-    default: null
+    default: Date.now
   },
   current_period_end: {
     type: Date,
-    default: null
+    required: true
   },
   
   // Trial Management
@@ -67,17 +49,47 @@ const subscriptionSchema = new mongoose.Schema({
     default: true
   },
   
-  // Cancellation
-  cancel_at_period_end: {
-    type: Boolean,
-    default: false
+  // Manual Billing Info
+  billing_amount: {
+    type: Number,
+    required: true
   },
-  canceled_at: {
+  billing_currency: {
+    type: String,
+    default: 'DKK'
+  },
+  billing_interval: {
+    type: String,
+    enum: ['monthly', 'yearly'],
+    default: 'monthly'
+  },
+  
+  // Cancellation
+  cancelled_at: {
+    type: Date,
+    default: null
+  },
+  cancelled_by: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
+  
+  // Manual Payment Tracking
+  last_payment_date: {
+    type: Date,
+    default: null
+  },
+  next_payment_date: {
     type: Date,
     default: null
   },
   
-
+  // Notes for manual management
+  notes: {
+    type: String,
+    default: ''
+  },
   
   // Metadata
   metadata: {
@@ -92,6 +104,7 @@ const subscriptionSchema = new mongoose.Schema({
 subscriptionSchema.index({ user_id: 1 });
 subscriptionSchema.index({ status: 1 });
 subscriptionSchema.index({ is_trial: 1 });
+subscriptionSchema.index({ current_period_end: 1 });
 
 // Validation: user_id is required
 subscriptionSchema.pre('validate', function(next) {
@@ -103,11 +116,9 @@ subscriptionSchema.pre('validate', function(next) {
 
 // Virtual to check if subscription is active
 subscriptionSchema.virtual('is_active').get(function() {
-  const activeStatuses = ['trialing', 'active'];
+  const activeStatuses = ['active'];
   return activeStatuses.includes(this.status);
 });
-
-
 
 // Virtual to check if subscription is expired
 subscriptionSchema.virtual('is_expired').get(function() {
@@ -125,7 +136,7 @@ subscriptionSchema.virtual('days_until_expiration').get(function() {
 
 // Method to check if subscription allows access
 subscriptionSchema.methods.hasAccess = function() {
-  const activeStatuses = ['trialing', 'active'];
+  const activeStatuses = ['active'];
   
   // Check status
   if (!activeStatuses.includes(this.status)) return false;
@@ -138,27 +149,30 @@ subscriptionSchema.methods.hasAccess = function() {
   return true;
 };
 
-
-
 // Method to cancel subscription
-subscriptionSchema.methods.cancel = function(cancelAtPeriodEnd = true) {
-  if (cancelAtPeriodEnd) {
-    this.cancel_at_period_end = true;
-  } else {
-    this.status = 'canceled';
-    this.canceled_at = new Date();
-  }
+subscriptionSchema.methods.cancel = function(cancelledBy = null) {
+  this.status = 'cancelled';
+  this.cancelled_at = new Date();
+  this.cancelled_by = cancelledBy;
   return this;
 };
 
 // Method to reactivate subscription
 subscriptionSchema.methods.reactivate = function() {
   this.status = 'active';
-  this.cancel_at_period_end = false;
-  this.canceled_at = null;
+  this.cancelled_at = null;
+  this.cancelled_by = null;
   return this;
 };
 
-
+// Method to extend subscription
+subscriptionSchema.methods.extend = function(days = 30) {
+  const newEndDate = new Date(this.current_period_end);
+  newEndDate.setDate(newEndDate.getDate() + days);
+  this.current_period_end = newEndDate;
+  this.last_payment_date = new Date();
+  this.next_payment_date = newEndDate;
+  return this;
+};
 
 module.exports = mongoose.model('Subscription', subscriptionSchema); 

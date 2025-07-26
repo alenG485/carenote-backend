@@ -19,11 +19,6 @@ SUPER_ADMIN_EMAIL=admin@carenote.dk
 
 RESEND_API_KEY=
 
-
-# Stripe Configuration (Required)
-STRIPE_SECRET_KEY=
-STRIPE_WEBHOOK_SECRET=
-
 # Corti.AI Configuration (Required)
 CORTI_ENVIRONMENT=eu
 CORTI_TENANT_NAME=base

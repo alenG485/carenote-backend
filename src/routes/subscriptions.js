@@ -1,15 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const subscriptionController = require('../controllers/subscriptionController');
-const { authenticate, requireCompanyAdmin } = require('../middleware/auth');
+const { authenticate, requireSuperAdmin } = require('../middleware/auth');
 const { subscriptionValidation, paramValidation } = require('../middleware/validation');
 
 /**
  * Subscription Routes
- * Handles subscription management with Stripe integration
+ * Handles manual subscription management
  */
-
-
 
 /**
  * @route   GET /api/subscriptions/current
@@ -17,6 +15,25 @@ const { subscriptionValidation, paramValidation } = require('../middleware/valid
  * @access  Private
  */
 router.get('/current', authenticate, subscriptionController.getCurrentSubscription);
+
+/**
+ * @route   GET /api/subscriptions
+ * @desc    Get all subscriptions (admin only)
+ * @access  Private (Super Admin)
+ */
+router.get('/', authenticate, requireSuperAdmin, subscriptionController.getAllSubscriptions);
+
+/**
+ * @route   GET /api/subscriptions/:id
+ * @desc    Get subscription by ID (admin only)
+ * @access  Private (Super Admin)
+ */
+router.get('/:id', 
+  authenticate, 
+  requireSuperAdmin,
+  paramValidation.mongoId('id'),
+  subscriptionController.getSubscriptionById
+);
 
 /**
  * @route   POST /api/subscriptions
@@ -27,17 +44,6 @@ router.post('/',
   authenticate, 
   subscriptionValidation.create, 
   subscriptionController.createSubscription
-);
-
-/**
- * @route   POST /api/subscriptions/:id/checkout
- * @desc    Create Stripe checkout session
- * @access  Private
- */
-router.post('/:id/checkout', 
-  authenticate,
-  paramValidation.mongoId('id'),
-  subscriptionController.createCheckoutSession
 );
 
 /**
@@ -75,13 +81,14 @@ router.post('/:id/reactivate',
 );
 
 /**
- * @route   POST /api/subscriptions/webhook
- * @desc    Handle Stripe webhook
- * @access  Public (Stripe webhook)
+ * @route   POST /api/subscriptions/:id/extend
+ * @desc    Extend subscription
+ * @access  Private
  */
-router.post('/webhook', 
-  express.raw({ type: 'application/json' }),
-  subscriptionController.handleStripeWebhook
+router.post('/:id/extend', 
+  authenticate,
+  paramValidation.mongoId('id'),
+  subscriptionController.extendSubscription
 );
 
 module.exports = router; 

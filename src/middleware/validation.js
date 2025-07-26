@@ -48,9 +48,10 @@ const userValidation = {
         }
         return true;
       }),
-    body('stripe_price_id')
-      .notEmpty()
-      .withMessage('Stripe price ID is required'),
+    body('plan_name')
+      .optional()
+      .isIn(['individual', 'clinic-small', 'clinic-medium', 'clinic-large'])
+      .withMessage('Plan name must be one of: individual, clinic-small, clinic-medium, clinic-large'),
     body('trialEndDate')
       .optional()
       .isISO8601()
@@ -238,24 +239,45 @@ const templateValidation = {
 // Subscription validation rules
 const subscriptionValidation = {
   create: [
-    body('stripe_price_id')
-      .notEmpty()
-      .withMessage('Stripe price ID is required'),
+    body('plan_name')
+      .optional()
+      .isIn(['individual', 'clinic-small', 'clinic-medium', 'clinic-large'])
+      .withMessage('Plan name must be one of: individual, clinic-small, clinic-medium, clinic-large'),
+    body('billing_amount')
+      .optional()
+      .isFloat({ min: 0 })
+      .withMessage('Billing amount must be a positive number'),
     body('billing_interval')
       .optional()
       .isIn(['monthly', 'yearly'])
-      .withMessage('Billing interval must be monthly or yearly')
+      .withMessage('Billing interval must be monthly or yearly'),
+    body('trial_days')
+      .optional()
+      .isInt({ min: 1, max: 365 })
+      .withMessage('Trial days must be between 1 and 365')
   ],
 
   update: [
-    body('stripe_price_id')
+    body('plan_name')
       .optional()
-      .notEmpty()
-      .withMessage('Stripe price ID cannot be empty if provided'),
+      .isIn(['individual', 'clinic-small', 'clinic-medium', 'clinic-large'])
+      .withMessage('Plan name must be one of: individual, clinic-small, clinic-medium, clinic-large'),
+    body('billing_amount')
+      .optional()
+      .isFloat({ min: 0 })
+      .withMessage('Billing amount must be a positive number'),
     body('billing_interval')
       .optional()
       .isIn(['monthly', 'yearly'])
-      .withMessage('Billing interval must be monthly or yearly')
+      .withMessage('Billing interval must be monthly or yearly'),
+    body('status')
+      .optional()
+      .isIn(['active', 'inactive', 'expired', 'cancelled'])
+      .withMessage('Status must be one of: active, inactive, expired, cancelled'),
+    body('notes')
+      .optional()
+      .isString()
+      .withMessage('Notes must be a string')
   ]
 };
 

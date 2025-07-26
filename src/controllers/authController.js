@@ -43,7 +43,7 @@ const register = async (req, res) => {
       return errorResponse(res, 'Validation failed', 400, errors.array());
     }
 
-    const { email, password, name, specialty, phone, workplace, journalSystem, role, companyName, maxUsers, trialEndDate, stripe_price_id } = req.body;
+    const { email, password, name, specialty, phone, workplace, journalSystem, role, companyName, maxUsers, trialEndDate, plan_name } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -102,13 +102,24 @@ const register = async (req, res) => {
     // Create trial subscription for the user
     const trialEnd = trialEndDate ? new Date(trialEndDate) : new Date(Date.now() + 15 * 24 * 60 * 60 * 1000); // 15 days default
     
+    // Set billing amount based on plan
+    const billingAmounts = {
+      'individual': 599,
+      'clinic-small': 599,
+      'clinic-medium': 550,
+      'clinic-large': 525
+    };
+    
     const subscription = new Subscription({
       user_id: user._id,
-      stripe_price_id: stripe_price_id,
-      status: 'trialing',
+      plan_name: plan_name || 'individual',
+      status: 'active',
       is_trial: true,
       current_period_start: new Date(),
-      current_period_end: trialEnd
+      current_period_end: trialEnd,
+      billing_amount: billingAmounts[plan_name || 'individual'],
+      billing_currency: 'DKK',
+      billing_interval: 'monthly'
     });
 
     await subscription.save();
@@ -163,7 +174,9 @@ const register = async (req, res) => {
       status: subscription.status,
       is_trial: subscription.is_trial,
       current_period_end: subscription.current_period_end,
-      stripe_price_id: subscription.stripe_price_id
+      plan_name: subscription.plan_name,
+      billing_amount: subscription.billing_amount,
+      billing_interval: subscription.billing_interval
     };
 
     return successResponse(res, response, 'User registered successfully', 201);
