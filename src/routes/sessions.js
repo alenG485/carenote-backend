@@ -33,14 +33,14 @@ router.get('/',
 );
 
 /**
- * @route   GET /api/sessions/:sessionId/ws-url
- * @desc    Get WebSocket URL for active session
+ * @route   GET /api/sessions/:sessionId
+ * @desc    Get session
  * @access  Private
  */
-router.get('/:sessionId/ws-url', 
+router.get('/:sessionId', 
   authenticate,
   paramValidation.mongoId('sessionId'),
-  sessionController.getWebSocketUrl
+  sessionController.getSession
 );
 
 /**
@@ -77,6 +77,17 @@ router.put('/:sessionId/facts/:factId',
   paramValidation.mongoId('factId'),
   sessionValidation.updateFact,
   sessionController.updateFact
+);
+
+/**
+ * @route   POST /api/sessions/:sessionId/start-recording
+ * @desc    Start session recording
+ * @access  Private
+ */
+router.post('/:sessionId/start-recording', 
+  authenticate,
+  paramValidation.mongoId('sessionId'),
+  sessionController.startSessionRecording
 );
 
 /**

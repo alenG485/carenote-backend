@@ -136,7 +136,7 @@ subscriptionSchema.virtual('days_until_expiration').get(function() {
 
 // Method to check if subscription allows access
 subscriptionSchema.methods.hasAccess = function() {
-  const activeStatuses = ['active'];
+  const activeStatuses = ['active', 'trialing'];
   
   // Check status
   if (!activeStatuses.includes(this.status)) return false;

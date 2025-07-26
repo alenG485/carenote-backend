@@ -1,6 +1,8 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { errorResponse } = require('../utils/responses');
+const Subscription = require('../models/Subscription');
+
 
 /**
  * Authentication Middleware
@@ -100,7 +102,6 @@ const requireCompanyAccess = (companyIdParam = 'companyId') => {
  */
 const requireActiveSubscription = async (req, res, next) => {
   try {
-    const Subscription = require('../models/Subscription');
     
     let subscription;
     

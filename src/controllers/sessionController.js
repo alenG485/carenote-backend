@@ -29,17 +29,16 @@ const startSession = async (req, res) => {
 
     // Create interaction with Corti API
     const interactionResponse = await cortiService.createInteraction(req.user._id, patient_data);
-    
-    if (!interactionResponse || !interactionResponse.id) {
-      return errorResponse(res, 'Failed to create Corti interaction', 500);
-    }
+
+    const token = await cortiService.getAccessToken();
+
 
     // Create session in database
     const session = new Session({
       user_id: req.user._id,
-      corti_interaction_id: interactionResponse.id,
+      corti_interaction_id: interactionResponse.interactionId,
       websocket_url: interactionResponse.websocketUrl,
-      access_token: interactionResponse.accessToken,
+      access_token: token,
       session_title,
       specialty,
       patient_identifier,
@@ -51,10 +50,7 @@ const startSession = async (req, res) => {
     const savedSession = await session.save();
 
     return successResponse(res, {
-      session: savedSession,
-      websocket_url: interactionResponse.websocketUrl,
-      access_token: interactionResponse.accessToken,
-      interaction_id: interactionResponse.id
+      session: savedSession
     }, 'Session started successfully', 201);
 
   } catch (error) {
@@ -64,17 +60,16 @@ const startSession = async (req, res) => {
 };
 
 /**
- * Get WebSocket URL for active session
- * GET /api/sessions/:sessionId/ws-url
+ * Get session
+ * GET /api/sessions/:sessionId
  */
-const getWebSocketUrl = async (req, res) => {
+const getSession = async (req, res) => {
   try {
     const { sessionId } = req.params;
 
     const session = await Session.findOne({
       _id: sessionId,
-      user_id: req.user._id,
-      status: 'active'
+      user_id: req.user._id
     });
 
     if (!session) {
@@ -82,10 +77,8 @@ const getWebSocketUrl = async (req, res) => {
     }
 
     return successResponse(res, {
-      websocket_url: session.websocket_url,
-      access_token: session.access_token,
-      interaction_id: session.corti_interaction_id
-    }, 'WebSocket URL retrieved successfully');
+      session: session
+    }, 'Session retrieved successfully');
 
   } catch (error) {
     console.error('Get WebSocket URL error:', error);
@@ -262,6 +255,38 @@ const updateFact = async (req, res) => {
 };
 
 /**
+ * Start session recording
+ * POST /api/sessions/:sessionId/start-recording
+ */
+const startSessionRecording = async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+
+    const session = await Session.findOne({
+      _id: sessionId,
+      user_id: req.user._id,
+      status: 'active'
+    });
+
+    if (!session) {
+      return errorResponse(res, 'Active session not found', 404);
+    }
+
+    // Update session status to started
+    session.status = 'started';
+    await session.save();
+
+    return successResponse(res, {
+      session: session
+    }, 'Session recording started successfully');
+
+  } catch (error) {
+    console.error('Start session recording error:', error);
+    return errorResponse(res, 'Failed to start session recording', 500);
+  }
+};
+
+/**
  * End recording session
  * POST /api/sessions/:sessionId/end
  */
@@ -271,8 +296,7 @@ const endSession = async (req, res) => {
 
     const session = await Session.findOne({
       _id: sessionId,
-      user_id: req.user._id,
-      status: 'active'
+      user_id: req.user._id
     });
 
     if (!session) {
@@ -342,10 +366,11 @@ const getUserSessions = async (req, res) => {
 
 module.exports = {
   startSession,
-  getWebSocketUrl,
+  getSession,
   getSessionFacts,
   addFact,
   updateFact,
+  startSessionRecording,
   endSession,
   getUserSessions
 }; 

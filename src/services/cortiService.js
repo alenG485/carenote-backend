@@ -97,10 +97,6 @@ class CortiService {
         }
       });
 
-      if (response.status !== 200 && response.status !== 201) {
-        throw new Error(`Failed to create interaction: ${response.status}`);
-      }
-
       return response.data;
     } catch (error) {
       throw new Error(`Failed to create Corti interaction: ${error.message}`);

@@ -71,7 +71,7 @@ const sessionSchema = new mongoose.Schema({
   // Session Status
   status: {
     type: String,
-    enum: ['active', 'completed', 'failed', 'cancelled'],
+    enum: ['active','started', 'completed', 'failed', 'cancelled'],
     default: 'active'
   },
   
