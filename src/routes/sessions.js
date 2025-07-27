@@ -122,4 +122,15 @@ router.post('/:sessionId/end',
   sessionController.endSession
 );
 
+/**
+ * @route   DELETE /api/sessions/:sessionId
+ * @desc    Soft delete session
+ * @access  Private
+ */
+router.delete('/:sessionId', 
+  authenticate,
+  paramValidation.mongoId('sessionId'),
+  sessionController.deleteSession
+);
+
 module.exports = router; 

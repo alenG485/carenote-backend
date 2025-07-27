@@ -256,7 +256,7 @@ templateSchema.statics.getTemplatesForUser = function(currentUser, options = {})
   
   return this.find(query)
     .populate('user_id', 'name email specialty')
-    .populate('session_id', 'corti_interaction_id duration')
+    .populate('session_id', 'corti_interaction_id')
     .sort({ created_at: -1 })
     .limit(limit)
     .skip(skip);
@@ -273,7 +273,7 @@ templateSchema.statics.getCompanyTemplates = async function(companyId, options =
   
   return this.find({ user_id: { $in: userIds } })
     .populate('user_id', 'name email specialty')
-    .populate('session_id', 'corti_interaction_id duration')
+    .populate('session_id', 'corti_interaction_id')
     .sort({ created_at: -1 })
     .limit(limit)
     .skip(skip);

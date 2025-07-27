@@ -70,7 +70,8 @@ const getSession = async (req, res) => {
 
     const session = await Session.findOne({
       _id: sessionId,
-      user_id: req.user._id
+      user_id: req.user._id,
+      deleted: false
     });
 
     if (!session) {
@@ -97,7 +98,8 @@ const getSessionFacts = async (req, res) => {
 
     const session = await Session.findOne({
       _id: sessionId,
-      user_id: req.user._id
+      user_id: req.user._id,
+      deleted: false
     });
 
     if (!session) {
@@ -134,7 +136,8 @@ const addFact = async (req, res) => {
 
     const session = await Session.findOne({
       _id: sessionId,
-      user_id: req.user._id
+      user_id: req.user._id,
+      deleted: false
     });
 
     if (!session) {
@@ -170,7 +173,8 @@ const updateFact = async (req, res) => {
 
     const session = await Session.findOne({
       _id: sessionId,
-      user_id: req.user._id
+      user_id: req.user._id,
+      deleted: false
     });
 
     if (!session) {
@@ -249,9 +253,7 @@ const endSession = async (req, res) => {
     await session.save();
 
     return successResponse(res, {
-      session: session,
-      duration: session.calculated_duration,
-      facts_count: session.active_facts.length
+      session: session
     }, 'Session ended successfully');
 
   } catch (error) {
@@ -297,6 +299,9 @@ const getUserSessions = async (req, res) => {
       query.user_id = req.user._id;
     }
     
+    // Exclude deleted sessions
+    query.deleted = false;
+    
     // Add status filter if provided
     if (status) {
       query.status = status;
@@ -313,7 +318,7 @@ const getUserSessions = async (req, res) => {
       .sort({ created_at: -1 })
       .limit(parseInt(limit))
       .skip(skip)
-      .select('corti_interaction_id status session_title duration started_at ended_at created_at user_id')
+      .select('corti_interaction_id status session_title started_at ended_at created_at user_id')
       .populate('user_id', 'name email specialty')
       .lean(); // Use lean() for better performance with large datasets
 
@@ -381,11 +386,12 @@ const getCompanySessions = async (req, res) => {
     // Get sessions for all company users
     const sessions = await Session.find({
       user_id: { $in: userIds },
-      created_at: { $gte: daysAgo }
+      created_at: { $gte: daysAgo },
+      deleted: false
     })
       .sort({ created_at: -1 })
       .limit(parseInt(limit))
-      .select('corti_interaction_id status session_title duration started_at ended_at created_at user_id')
+      .select('corti_interaction_id status session_title started_at ended_at created_at user_id')
       .populate('user_id', 'name email specialty')
       .lean();
 
@@ -441,7 +447,8 @@ const getRecentSessions = async (req, res) => {
     twoDaysAgo.setHours(0, 0, 0, 0); // Start of day
 
     let query = { 
-      created_at: { $gte: twoDaysAgo }
+      created_at: { $gte: twoDaysAgo },
+      deleted: false
     };
 
     // Handle different user roles
@@ -473,7 +480,7 @@ const getRecentSessions = async (req, res) => {
     const sessions = await Session.find(query)
       .sort({ created_at: -1 })
       .limit(parseInt(limit))
-      .select('corti_interaction_id status session_title duration started_at ended_at created_at user_id')
+      .select('corti_interaction_id status session_title started_at ended_at created_at user_id')
       .populate('user_id', 'name email specialty')
       .lean(); // Use lean() for better performance
 
@@ -495,6 +502,38 @@ const getRecentSessions = async (req, res) => {
   }
 };
 
+/**
+ * Soft delete a session
+ * DELETE /api/sessions/:sessionId
+ */
+const deleteSession = async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+
+    const session = await Session.findOne({
+      _id: sessionId,
+      user_id: req.user._id,
+      deleted: false
+    });
+
+    if (!session) {
+      return errorResponse(res, 'Session not found', 404);
+    }
+
+    // Soft delete the session
+    session.softDelete();
+    await session.save();
+
+    return successResponse(res, {
+      session_id: sessionId
+    }, 'Session deleted successfully');
+
+  } catch (error) {
+    console.error('Delete session error:', error);
+    return errorResponse(res, 'Failed to delete session', 500);
+  }
+};
+
 module.exports = {
   startSession,
   getSession,
@@ -505,5 +544,6 @@ module.exports = {
   endSession,
   getUserSessions,
   getRecentSessions,
-  getCompanySessions
+  getCompanySessions,
+  deleteSession
 }; 

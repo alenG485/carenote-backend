@@ -178,7 +178,7 @@ const getTemplates = async (req, res) => {
 
       templates = await Template.find(query)
         .populate('user_id', 'name email specialty')
-        .populate('session_id', 'corti_interaction_id duration')
+        .populate('session_id', 'corti_interaction_id')
         .sort({ created_at: -1 })
         .limit(options.limit)
         .skip(options.skip);
@@ -227,8 +227,7 @@ const getTemplate = async (req, res) => {
 
     const template = await Template.findById(id)
       .populate('user_id', 'name email specialty')
-      .populate('session_id', 'corti_interaction_id duration facts')
-      .populate('previous_version', 'title version created_at');
+      .populate('session_id', 'corti_interaction_id');
 
     if (!template) {
       return errorResponse(res, 'Template not found', 404);
