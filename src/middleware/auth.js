@@ -105,10 +105,10 @@ const requireActiveSubscription = async (req, res, next) => {
     
     let subscription;
     
-    if (req.user.company_id) {
+    if (req.user.role === 'user' && !!req.user.invited_by) {
       // Company user - check company subscription
       subscription = await Subscription.findOne({
-        company_id: req.user.company_id,
+        user_id: req.user.invited_by,
         status: { $in: ['trialing', 'active'] }
       });
     } else {
@@ -120,14 +120,14 @@ const requireActiveSubscription = async (req, res, next) => {
     }
 
     if (!subscription || !subscription.hasAccess()) {
-      return errorResponse(res, 'Active subscription required', 402);
+      return errorResponse(res, 'Aktivt abonnement påkrævet', 402);
     }
 
     req.subscription = subscription;
     next();
   } catch (error) {
     console.error('Subscription check error:', error);
-    return errorResponse(res, 'Failed to verify subscription', 500);
+    return errorResponse(res, 'Abonnementet kunne ikke bekræftes', 500);
   }
 };
 

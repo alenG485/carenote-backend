@@ -88,7 +88,7 @@ const getSession = async (req, res) => {
 };
 
 /**
- * Get session facts
+ * Get session facts from Corti API
  * GET /api/sessions/:sessionId/facts
  */
 const getSessionFacts = async (req, res) => {
@@ -104,38 +104,14 @@ const getSessionFacts = async (req, res) => {
       return errorResponse(res, 'Session not found', 404);
     }
 
-    // Get latest facts from Corti API
-    try {
-      const cortiFacts = await cortiService.getFacts(session.corti_interaction_id);
-      
-      // Update session facts
-      session.facts = cortiFacts.map(fact => ({
-        fact_id: fact.id,
-        text: fact.text,
-        group: fact.group,
-        confidence: fact.confidence || 1.0,
-        source: fact.source || 'ai',
-        is_discarded: fact.isDiscarded || false,
-        created_at: fact.createdAt ? new Date(fact.createdAt) : new Date(),
-        updated_at: fact.updatedAt ? new Date(fact.updatedAt) : new Date()
-      }));
-
-      await session.save();
-    } catch (cortiError) {
-      console.warn('Failed to sync facts from Corti:', cortiError.message);
-      // Continue with stored facts if Corti API fails
-    }
-
-    // Return facts grouped by category
-    const factsByGroup = session.getFactsByGroup();
+    // Fetch facts directly from Corti API
+    const facts = await cortiService.getFacts(session.corti_interaction_id);
 
     return successResponse(res, {
-      session_id: session._id,
-      facts: session.active_facts,
-      facts_by_group: factsByGroup,
-      total_facts: session.facts.length,
-      active_facts: session.active_facts.length
-    }, 'Session facts retrieved successfully');
+      facts: facts,
+      session_id: sessionId,
+      interaction_id: session.corti_interaction_id
+    }, 'Facts retrieved successfully');
 
   } catch (error) {
     console.error('Get session facts error:', error);
@@ -144,71 +120,17 @@ const getSessionFacts = async (req, res) => {
 };
 
 /**
- * Add fact to session
+ * Add fact to session via Corti API
  * POST /api/sessions/:sessionId/facts
  */
 const addFact = async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return errorResponse(res, 'Validation failed', 400, errors.array());
-    }
-
     const { sessionId } = req.params;
-    const { text, group, confidence = 1.0 } = req.body;
+    const { text, group, source = 'user' } = req.body;
 
-    const session = await Session.findOne({
-      _id: sessionId,
-      user_id: req.user._id,
-      status: 'active'
-    });
-
-    if (!session) {
-      return errorResponse(res, 'Active session not found', 404);
+    if (!text || !group) {
+      return errorResponse(res, 'Text and group are required', 400);
     }
-
-    // Add fact to Corti API
-    const cortiResponse = await cortiService.addFact(session.corti_interaction_id, {
-      text,
-      group,
-      source: 'user'
-    });
-
-    // Add fact to session
-    const newFact = session.addFact({
-      fact_id: cortiResponse.facts?.[0]?.id || `local_${Date.now()}`,
-      text,
-      group,
-      confidence,
-      source: 'user'
-    });
-
-    await session.save();
-
-    return successResponse(res, {
-      fact: newFact,
-      session_id: session._id
-    }, 'Fact added successfully', 201);
-
-  } catch (error) {
-    console.error('Add fact error:', error);
-    return errorResponse(res, error.message || 'Failed to add fact', 500);
-  }
-};
-
-/**
- * Update fact in session
- * PUT /api/sessions/:sessionId/facts/:factId
- */
-const updateFact = async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return errorResponse(res, 'Validation failed', 400, errors.array());
-    }
-
-    const { sessionId, factId } = req.params;
-    const { text, group, confidence, is_discarded } = req.body;
 
     const session = await Session.findOne({
       _id: sessionId,
@@ -219,39 +141,57 @@ const updateFact = async (req, res) => {
       return errorResponse(res, 'Session not found', 404);
     }
 
-    // Update fact in Corti API
-    try {
-      const fact = session.facts.id(factId);
-      if (fact && fact.fact_id) {
-        await cortiService.updateFact(session.corti_interaction_id, fact.fact_id, {
-          text: text || fact.text,
-          group: group || fact.group,
-          isDiscarded: is_discarded !== undefined ? is_discarded : fact.is_discarded
-        });
-      }
-    } catch (cortiError) {
-      console.warn('Failed to update fact in Corti:', cortiError.message);
-      // Continue with local update if Corti API fails
-    }
-
-    // Update fact in session
-    const updatedFact = session.updateFact(factId, {
+    // Add fact via Corti API
+    const result = await cortiService.addFact(session.corti_interaction_id, {
       text,
       group,
-      confidence,
-      is_discarded
+      source
     });
 
-    await session.save();
+    return successResponse(res, {
+      fact: result,
+      session_id: sessionId
+    }, 'Fact added successfully');
+
+  } catch (error) {
+    console.error('Add fact error:', error);
+    return errorResponse(res, 'Failed to add fact', 500);
+  }
+};
+
+/**
+ * Update fact via Corti API
+ * PUT /api/sessions/:sessionId/facts/:factId
+ */
+const updateFact = async (req, res) => {
+  try {
+    const { sessionId, factId } = req.params;
+    const { text, group, isDiscarded } = req.body;
+
+    const session = await Session.findOne({
+      _id: sessionId,
+      user_id: req.user._id
+    });
+
+    if (!session) {
+      return errorResponse(res, 'Session not found', 404);
+    }
+
+    // Update fact via Corti API
+    const result = await cortiService.updateFact(session.corti_interaction_id, factId, {
+      text,
+      group,
+      isDiscarded
+    });
 
     return successResponse(res, {
-      fact: updatedFact,
-      session_id: session._id
+      fact: result,
+      session_id: sessionId
     }, 'Fact updated successfully');
 
   } catch (error) {
     console.error('Update fact error:', error);
-    return errorResponse(res, error.message || 'Failed to update fact', 500);
+    return errorResponse(res, 'Failed to update fact', 500);
   }
 };
 
@@ -373,17 +313,17 @@ const getUserSessions = async (req, res) => {
       .sort({ created_at: -1 })
       .limit(parseInt(limit))
       .skip(skip)
-      .select('corti_interaction_id status session_title duration started_at ended_at facts created_at user_id')
+      .select('corti_interaction_id status session_title duration started_at ended_at created_at user_id')
       .populate('user_id', 'name email specialty')
       .lean(); // Use lean() for better performance with large datasets
 
     const total = await Session.countDocuments(query);
 
-    // Add session statistics
+    // Add session statistics (without facts since they're fetched from Corti)
     const sessionStats = sessions.map(session => ({
       ...session,
-      facts_count: session.facts ? session.facts.length : 0,
-      active_facts_count: session.facts ? session.facts.filter(fact => !fact.is_discarded).length : 0
+      facts_count: 0, // Will be fetched from Corti when needed
+      active_facts_count: 0 // Will be fetched from Corti when needed
     }));
 
     return successResponse(res, {
@@ -445,7 +385,7 @@ const getCompanySessions = async (req, res) => {
     })
       .sort({ created_at: -1 })
       .limit(parseInt(limit))
-      .select('corti_interaction_id status session_title duration started_at ended_at facts created_at user_id')
+      .select('corti_interaction_id status session_title duration started_at ended_at created_at user_id')
       .populate('user_id', 'name email specialty')
       .lean();
 
@@ -456,7 +396,7 @@ const getCompanySessions = async (req, res) => {
         user: user,
         sessions: [],
         total_sessions: 0,
-        total_facts: 0
+        total_facts: 0 // Will be calculated from Corti when needed
       };
     });
 
@@ -466,7 +406,7 @@ const getCompanySessions = async (req, res) => {
       if (userSessions[userId]) {
         userSessions[userId].sessions.push(session);
         userSessions[userId].total_sessions++;
-        userSessions[userId].total_facts += session.facts ? session.facts.filter(fact => !fact.is_discarded).length : 0;
+        // Facts count will be fetched from Corti when needed
       }
     });
 
@@ -533,15 +473,15 @@ const getRecentSessions = async (req, res) => {
     const sessions = await Session.find(query)
       .sort({ created_at: -1 })
       .limit(parseInt(limit))
-      .select('corti_interaction_id status session_title duration started_at ended_at facts created_at user_id')
+      .select('corti_interaction_id status session_title duration started_at ended_at created_at user_id')
       .populate('user_id', 'name email specialty')
       .lean(); // Use lean() for better performance
 
-    // Add session statistics
+    // Add session statistics (without facts since they're fetched from Corti)
     const sessionStats = sessions.map(session => ({
       ...session,
-      facts_count: session.facts ? session.facts.length : 0,
-      active_facts_count: session.facts ? session.facts.filter(fact => !fact.is_discarded).length : 0
+      facts_count: 0, // Will be fetched from Corti when needed
+      active_facts_count: 0 // Will be fetched from Corti when needed
     }));
 
     return successResponse(res, {
