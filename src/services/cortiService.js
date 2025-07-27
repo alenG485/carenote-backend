@@ -207,7 +207,7 @@ class CortiService {
   /**
    * Generate template from interaction facts
    */
-  async generateTemplate(interactionId, templateType = 'brief-clinical-note', outputLanguage = process.env.APP_LANGUAGE || 'da') {
+  async generateTemplate(interactionId, templateType = 'brief-clinical-note', outputLanguage) {
     try {
       const token = await this.getAccessToken();
       

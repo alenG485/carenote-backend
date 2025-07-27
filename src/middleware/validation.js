@@ -195,44 +195,8 @@ const templateValidation = {
       .withMessage('Valid session ID is required'),
     body('type')
       .optional()
-      .isIn(['soap', 'brief-clinical-note', 'custom'])
-      .withMessage('Invalid template type'),
-    body('title')
-      .optional()
-      .trim()
-      .isLength({ min: 1, max: 200 })
-      .withMessage('Title must be between 1 and 200 characters'),
-    body('referral')
-      .optional()
-      .trim()
-      .isLength({ max: 500 })
-      .withMessage('Referral must be less than 500 characters'),
-    body('patient_info')
-      .optional()
-      .isObject()
-      .withMessage('Patient info must be an object')
-  ],
-
-  update: [
-    body('title')
-      .optional()
-      .trim()
-      .isLength({ min: 1, max: 200 })
-      .withMessage('Title must be between 1 and 200 characters'),
-    body('content')
-      .optional()
-      .trim()
-      .isLength({ min: 1 })
-      .withMessage('Content cannot be empty'),
-    body('status')
-      .optional()
-      .isIn(['draft', 'final', 'archived'])
-      .withMessage('Invalid status'),
-    body('referral')
-      .optional()
-      .trim()
-      .isLength({ max: 500 })
-      .withMessage('Referral must be less than 500 characters')
+      .isIn(['soap', 'brief-clinical-note'])
+      .withMessage('Invalid template type')
   ]
 };
 
