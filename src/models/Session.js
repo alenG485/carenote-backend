@@ -235,4 +235,10 @@ sessionSchema.pre('save', function(next) {
   next();
 });
 
+// Indexes for better performance with large datasets
+sessionSchema.index({ user_id: 1, created_at: -1 }); // For recent sessions queries
+sessionSchema.index({ user_id: 1, status: 1 }); // For status-based queries
+sessionSchema.index({ created_at: -1 }); // For date-based queries
+sessionSchema.index({ corti_interaction_id: 1 }); // For Corti ID lookups
+
 module.exports = mongoose.model('Session', sessionSchema); 

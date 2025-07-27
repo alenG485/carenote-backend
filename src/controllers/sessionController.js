@@ -1,5 +1,6 @@
 const { validationResult } = require('express-validator');
 const Session = require('../models/Session');
+const User = require('../models/User');
 const cortiService = require('../services/cortiService');
 const { successResponse, errorResponse } = require('../utils/responses');
 
@@ -320,32 +321,69 @@ const endSession = async (req, res) => {
 };
 
 /**
- * Get user's sessions
+ * Get user's sessions (with pagination for all sessions)
  * GET /api/sessions
  */
 const getUserSessions = async (req, res) => {
   try {
-    const { limit = 10, page = 1, status } = req.query;
+    const { limit = 50, page = 1, status, days, user_id } = req.query;
     const skip = (page - 1) * limit;
 
-    let query = { user_id: req.user._id };
+    let query = {};
+    
+    // Handle different user roles
+    if (req.user.role === 'super_admin') {
+      // Super admin can see all sessions
+      if (user_id) {
+        query.user_id = user_id;
+      }
+    } else if (req.user.role === 'company_admin') {
+      // Company admin can see sessions from users in their company
+      if (user_id) {
+        // Verify the user belongs to the company admin's company
+        const targetUser = await User.findById(user_id);
+        if (!targetUser || targetUser.company_id?.toString() !== req.user.company_id?.toString()) {
+          return errorResponse(res, 'Access denied to this user\'s sessions', 403);
+        }
+        query.user_id = user_id;
+      } else {
+        // Get all users in the company
+        const companyUsers = await User.find({ company_id: req.user.company_id }).select('_id');
+        const userIds = companyUsers.map(user => user._id);
+        query.user_id = { $in: userIds };
+      }
+    } else {
+      // Regular user can only see their own sessions
+      query.user_id = req.user._id;
+    }
+    
+    // Add status filter if provided
     if (status) {
       query.status = status;
+    }
+
+    // Add date filter if days parameter is provided
+    if (days) {
+      const daysAgo = new Date();
+      daysAgo.setDate(daysAgo.getDate() - parseInt(days));
+      query.created_at = { $gte: daysAgo };
     }
 
     const sessions = await Session.find(query)
       .sort({ created_at: -1 })
       .limit(parseInt(limit))
       .skip(skip)
-      .select('corti_interaction_id status session_title duration started_at ended_at facts created_at');
+      .select('corti_interaction_id status session_title duration started_at ended_at facts created_at user_id')
+      .populate('user_id', 'name email specialty')
+      .lean(); // Use lean() for better performance with large datasets
 
     const total = await Session.countDocuments(query);
 
     // Add session statistics
     const sessionStats = sessions.map(session => ({
-      ...session.toJSON(),
-      facts_count: session.facts.length,
-      active_facts_count: session.active_facts.length
+      ...session,
+      facts_count: session.facts ? session.facts.length : 0,
+      active_facts_count: session.facts ? session.facts.filter(fact => !fact.is_discarded).length : 0
     }));
 
     return successResponse(res, {
@@ -364,6 +402,159 @@ const getUserSessions = async (req, res) => {
   }
 };
 
+/**
+ * Get company users and their recent sessions (for company admins)
+ * GET /api/sessions/company
+ */
+const getCompanySessions = async (req, res) => {
+  try {
+    const { limit = 50, days = 7 } = req.query;
+
+    // Only company admins and super admins can access this
+    if (req.user.role !== 'company_admin' && req.user.role !== 'super_admin') {
+      return errorResponse(res, 'Company admin access required', 403);
+    }
+
+    let companyId = req.user.company_id;
+    
+    // Super admin can specify company_id
+    if (req.user.role === 'super_admin' && req.query.company_id) {
+      companyId = req.query.company_id;
+    }
+
+    if (!companyId) {
+      return errorResponse(res, 'Company ID required', 400);
+    }
+
+    // Calculate date filter
+    const daysAgo = new Date();
+    daysAgo.setDate(daysAgo.getDate() - parseInt(days));
+    daysAgo.setHours(0, 0, 0, 0);
+
+    // Get all users in the company
+    const companyUsers = await User.find({ company_id: companyId })
+      .select('_id name email specialty role')
+      .lean();
+
+    const userIds = companyUsers.map(user => user._id);
+
+    // Get sessions for all company users
+    const sessions = await Session.find({
+      user_id: { $in: userIds },
+      created_at: { $gte: daysAgo }
+    })
+      .sort({ created_at: -1 })
+      .limit(parseInt(limit))
+      .select('corti_interaction_id status session_title duration started_at ended_at facts created_at user_id')
+      .populate('user_id', 'name email specialty')
+      .lean();
+
+    // Group sessions by user
+    const userSessions = {};
+    companyUsers.forEach(user => {
+      userSessions[user._id] = {
+        user: user,
+        sessions: [],
+        total_sessions: 0,
+        total_facts: 0
+      };
+    });
+
+    // Populate sessions for each user
+    sessions.forEach(session => {
+      const userId = session.user_id._id;
+      if (userSessions[userId]) {
+        userSessions[userId].sessions.push(session);
+        userSessions[userId].total_sessions++;
+        userSessions[userId].total_facts += session.facts ? session.facts.filter(fact => !fact.is_discarded).length : 0;
+      }
+    });
+
+    // Convert to array and sort by total sessions
+    const companyData = Object.values(userSessions)
+      .sort((a, b) => b.total_sessions - a.total_sessions);
+
+    return successResponse(res, {
+      company_users: companyData,
+      total_users: companyUsers.length,
+      total_sessions: sessions.length,
+      date_range: `${days} days`
+    }, 'Company sessions retrieved successfully');
+
+  } catch (error) {
+    console.error('Get company sessions error:', error);
+    return errorResponse(res, 'Failed to get company sessions', 500);
+  }
+};
+
+/**
+ * Get recent sessions (last 2 days only)
+ * GET /api/sessions/recent
+ */
+const getRecentSessions = async (req, res) => {
+  try {
+    const { limit = 100, user_id } = req.query;
+
+    // Calculate date 2 days ago
+    const twoDaysAgo = new Date();
+    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+    twoDaysAgo.setHours(0, 0, 0, 0); // Start of day
+
+    let query = { 
+      created_at: { $gte: twoDaysAgo }
+    };
+
+    // Handle different user roles
+    if (req.user.role === 'super_admin') {
+      // Super admin can see all sessions
+      if (user_id) {
+        query.user_id = user_id;
+      }
+    } else if (req.user.role === 'company_admin') {
+      // Company admin can see sessions from users in their company
+      if (user_id) {
+        // Verify the user belongs to the company admin's company
+        const targetUser = await User.findById(user_id);
+        if (!targetUser || targetUser.company_id?.toString() !== req.user.company_id?.toString()) {
+          return errorResponse(res, 'Access denied to this user\'s sessions', 403);
+        }
+        query.user_id = user_id;
+      } else {
+        // Get all users in the company
+        const companyUsers = await User.find({ company_id: req.user.company_id }).select('_id');
+        const userIds = companyUsers.map(user => user._id);
+        query.user_id = { $in: userIds };
+      }
+    } else {
+      // Regular user can only see their own sessions
+      query.user_id = req.user._id;
+    }
+
+    const sessions = await Session.find(query)
+      .sort({ created_at: -1 })
+      .limit(parseInt(limit))
+      .select('corti_interaction_id status session_title duration started_at ended_at facts created_at user_id')
+      .populate('user_id', 'name email specialty')
+      .lean(); // Use lean() for better performance
+
+    // Add session statistics
+    const sessionStats = sessions.map(session => ({
+      ...session,
+      facts_count: session.facts ? session.facts.length : 0,
+      active_facts_count: session.facts ? session.facts.filter(fact => !fact.is_discarded).length : 0
+    }));
+
+    return successResponse(res, {
+      sessions: sessionStats,
+      total_sessions: sessionStats.length
+    }, 'Recent sessions retrieved successfully');
+
+  } catch (error) {
+    console.error('Get recent sessions error:', error);
+    return errorResponse(res, 'Failed to get recent sessions', 500);
+  }
+};
+
 module.exports = {
   startSession,
   getSession,
@@ -372,5 +563,7 @@ module.exports = {
   updateFact,
   startSessionRecording,
   endSession,
-  getUserSessions
+  getUserSessions,
+  getRecentSessions,
+  getCompanySessions
 }; 
