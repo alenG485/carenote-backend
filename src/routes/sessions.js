@@ -33,8 +33,18 @@ router.get('/company',
 );
 
 /**
+ * @route   GET /api/sessions/fact-groups
+ * @desc    Get fact groups from Corti API
+ * @access  Private
+ */
+router.get('/fact-groups', 
+  authenticate,
+  sessionController.getFactGroups
+);
+
+/**
  * @route   GET /api/sessions/recent
- * @desc    Get recent sessions (last 2 days only)
+ * @desc    Get recent sessions (last 2 days)
  * @access  Private
  */
 router.get('/recent', 

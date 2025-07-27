@@ -4,6 +4,7 @@ const User = require('../models/User');
 const cortiService = require('../services/cortiService');
 const { successResponse, errorResponse } = require('../utils/responses');
 
+
 /**
  * Session Controller
  * Handles Corti.AI recording sessions, facts management, and WebSocket connections
@@ -534,6 +535,47 @@ const deleteSession = async (req, res) => {
   }
 };
 
+/**
+ * Get fact groups from Corti API
+ * GET /api/sessions/fact-groups
+ */
+const getFactGroups = async (req, res) => {
+  try {
+    const { language = 'en' } = req.query;
+
+    // Get fact groups from Corti API
+    const factGroups = await cortiService.getFactGroups();
+
+    // Process fact groups based on language
+    const processedGroups = factGroups.map(group => {
+      // Find translation for the requested language
+      let translatedName = group.name; // Default to original name
+      
+      if (group.translations && Array.isArray(group.translations)) {
+        const translation = group.translations.find(t => t.languages_id === language);
+        if (translation) {
+          translatedName = translation.name;
+        }
+      }
+
+      return {
+        id: group.id,
+        key: group.key,
+        name: translatedName,
+      };
+    });
+
+    return successResponse(res, {
+      factGroups: processedGroups,
+      language: language
+    }, 'Fact groups retrieved successfully');
+
+  } catch (error) {
+    console.error('Get fact groups error:', error);
+    return errorResponse(res, 'Failed to get fact groups', 500);
+  }
+};
+
 module.exports = {
   startSession,
   getSession,
@@ -545,5 +587,6 @@ module.exports = {
   getUserSessions,
   getRecentSessions,
   getCompanySessions,
-  deleteSession
+  deleteSession,
+  getFactGroups
 }; 
