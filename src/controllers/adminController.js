@@ -454,19 +454,8 @@ const markSubscription = async (req, res) => {
       subscription.billing_currency = 'DKK';
       subscription.billing_interval = billing_interval;
       subscription.updated_at = currentDate;
-    } else {
-      // Create new subscription
-      subscription = new Subscription({
-        user_id: userId,
-        plan_name: plan_name,
-        status: status,
-        is_trial: false,
-        current_period_start: accessDate,
-        current_period_end: expiryDate,
-        billing_amount: parseFloat(billing_amount),
-        billing_currency: 'DKK',
-        billing_interval: billing_interval
-      });
+    } else{
+      return errorResponse(res, 'User does not have a subscription', 400);
     }
 
     await subscription.save();
