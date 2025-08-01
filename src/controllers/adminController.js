@@ -87,32 +87,11 @@ const getAnalytics = async (req, res) => {
       role: 'company_admin' 
     });
     
-    // Get users on trial (excluding super admin)
-    const trialUsers = await Subscription.countDocuments({
-      is_trial: true,
-      user_id: { 
-        $in: await User.find({ role: { $ne: 'super_admin' } }).distinct('_id') 
-      }
-    });
 
-    // Get company statistics
-    const totalCompanies = await Company.countDocuments();
-    const activeCompanies = await Company.countDocuments({ is_active: true });
 
-    // Get subscription statistics (excluding super admin)
-    const activeSubscriptions = await Subscription.countDocuments({
-      status: 'active',
-      user_id: { 
-        $in: await User.find({ role: { $ne: 'super_admin' } }).distinct('_id') 
-      }
-    });
 
-    const expiredSubscriptions = await Subscription.countDocuments({
-      status: 'expired',
-      user_id: { 
-        $in: await User.find({ role: { $ne: 'super_admin' } }).distinct('_id') 
-      }
-    });
+
+
 
     // Get recent activity (last 7 days registrations, excluding super admin)
     const sevenDaysAgo = new Date();
@@ -128,15 +107,7 @@ const getAnalytics = async (req, res) => {
         total: totalUsers,
         active: activeUsers,
         company_admins: companyAdminUsers,
-        on_trial: trialUsers
-      },
-      companies: {
-        total: totalCompanies,
-        active: activeCompanies
-      },
-      subscriptions: {
-        active: activeSubscriptions,
-        expired: expiredSubscriptions
+        normal_users: totalUsers - companyAdminUsers
       },
       recent_activity: {
         new_registrations_7_days: recentRegistrations
