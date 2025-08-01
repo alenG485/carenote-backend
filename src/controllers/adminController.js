@@ -203,11 +203,10 @@ const sendInvoice = async (req, res) => {
       user_name: user.name,
       invoice_number: invoice_number,
       invoice_date: new Date(invoice_date),
-      due_date: new Date(new Date(invoice_date).getTime() + 14 * 24 * 60 * 60 * 1000), // 14 days from invoice date
       amount: parseFloat(amount),
       description: description || 'CareNote Subscription',
-      status: 'pending',
-      created_by: req.user._id,
+      created_by: req.user._id, status: 'pending',
+      
       banking_details: {
         account_name: 'CareNote ApS',
         bank: 'Danske Bank',
@@ -370,7 +369,6 @@ const generateInvoiceHTML = (invoiceData) => {
           </div>
           <div class="invoice-info">
             <p><strong>Invoice Date:</strong> ${new Date(invoiceData.invoice_date).toLocaleDateString('da-DK')}</p>
-            <p><strong>Due Date:</strong> ${new Date(invoiceData.due_date).toLocaleDateString('da-DK')}</p>
           </div>
         </div>
         
