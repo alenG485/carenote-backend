@@ -25,6 +25,7 @@ const subscriptionSchema = new mongoose.Schema({
   status: {
     type: String,
     enum: [
+      'trialing',
       'active',
       'inactive',
       'expired',
