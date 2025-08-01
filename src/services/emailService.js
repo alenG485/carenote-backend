@@ -521,6 +521,49 @@ class EmailService {
       throw error;
     }
   }
+
+  /**
+   * Send invoice email
+   */
+  async sendInvoiceEmail(invoiceData) {
+    try {
+      if (!this.isConfigured()) {
+        this.logger.error('Resend API key not configured');
+        throw new Error('Email service not configured');
+      }
+
+      const { to, subject, invoiceData: data, invoiceHTML } = invoiceData;
+
+      const result = await this.resend.emails.send({
+        from: this.fromEmail,
+        to: to,
+        subject: subject || `Faktura ${data.invoice_number} - ${this.companyName}`,
+        html: invoiceHTML,
+        tags: [
+          { name: 'category', value: 'invoice' },
+          { name: 'user_type', value: 'billing' },
+          { name: 'invoice_number', value: data.invoice_number }
+        ]
+      });
+
+      this.logger.info('Invoice email sent successfully', { 
+        email: to, 
+        messageId: result.data?.id,
+        invoiceNumber: data.invoice_number,
+        amount: data.amount
+      });
+
+      return { success: true, messageId: result.data?.id };
+
+    } catch (error) {
+      this.logger.error('Failed to send invoice email', { 
+        email: invoiceData.to, 
+        error: error.message,
+        invoiceNumber: invoiceData.invoiceData?.invoice_number
+      });
+      throw error;
+    }
+  }
 }
 
 module.exports = new EmailService(); 

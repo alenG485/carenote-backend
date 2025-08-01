@@ -18,7 +18,7 @@ const subscriptionSchema = new mongoose.Schema({
   plan_name: {
     type: String,
     required: true,
-    enum: ['individual', 'clinic-small', 'clinic-medium', 'clinic-large']
+    enum: ['individual', 'clinic-small', 'clinic-medium', 'clinic-large', 'super_admin']
   },
   
   // Subscription Status
