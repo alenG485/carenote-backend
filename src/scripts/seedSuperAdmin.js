@@ -10,7 +10,7 @@ const { connectDB, disconnectDB } = require('../config/database');
  */
 
 const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL || 'admin@carenote.dk';
-const SUPER_ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD || 'admin123456';
+const SUPER_ADMIN_PASSWORD = process.env.SUPER_ADMIN_PASSWORD;
 const SUPER_ADMIN_NAME = process.env.SUPER_ADMIN_NAME || 'CareNote Admin';
 
 async function seedSuperAdmin() {
