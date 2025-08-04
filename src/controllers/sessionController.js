@@ -22,18 +22,19 @@ const startSession = async (req, res) => {
     }
 
     const { 
-      session_title = 'Recording Session',
+      session_title,
       specialty = 'general',
-      patient_identifier = null,
       encounter_type = 'consultation',
       patient_data = {}
     } = req.body;
+
+    // Auto-generate session title if not provided
+    const finalSessionTitle = session_title || `Konsultation - ${new Date().getMilliseconds()}`;
 
     // Create interaction with Corti API
     const interactionResponse = await cortiService.createInteraction(req.user._id, patient_data);
 
     const token = await cortiService.getAccessToken();
-
 
     // Create session in database
     const session = new Session({
@@ -41,9 +42,8 @@ const startSession = async (req, res) => {
       corti_interaction_id: interactionResponse.interactionId,
       websocket_url: interactionResponse.websocketUrl,
       access_token: token,
-      session_title,
+      session_title: finalSessionTitle,
       specialty,
-      patient_identifier,
       encounter_type,
       status: 'active',
       started_at: new Date()

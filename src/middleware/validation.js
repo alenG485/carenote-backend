@@ -135,11 +135,6 @@ const sessionValidation = {
       .optional()
       .isString()
       .withMessage('Specialty must be a string'),
-    body('patient_identifier')
-      .optional()
-      .trim()
-      .isLength({ max: 100 })
-      .withMessage('Patient identifier must be less than 100 characters'),
     body('encounter_type')
       .optional()
       .isIn(['consultation', 'follow_up', 'emergency', 'routine'])

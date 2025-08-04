@@ -82,10 +82,10 @@ class CortiService {
         },
         patient: {
           identifier: patientData.identifier || `${Date.now()}-patient`,
-          name: patientData.name || "Patient",
-          gender: patientData.gender || "unknown",
-          birthDate: patientData.birthDate || "1990-01-01T00:00:00Z",
-          pronouns: patientData.pronouns || "they/them"
+          name: "Patient",
+          gender: "unknown",
+          birthDate: "1990-01-01T00:00:00Z",
+          pronouns: "they/them"
         }
       };
 

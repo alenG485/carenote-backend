@@ -63,10 +63,6 @@ const sessionSchema = new mongoose.Schema({
   },
   
   // Additional Data
-  patient_identifier: {
-    type: String,
-    default: null
-  },
   encounter_type: {
     type: String,
     default: 'consultation'
