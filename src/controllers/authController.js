@@ -215,6 +215,11 @@ const login = async (req, res) => {
       return errorResponse(res, 'Invalid email or password', 401);
     }
 
+    // Check if email is verified
+    if (!user.email_verified) {
+      return errorResponse(res, 'Email not verified. Please check your email and verify your account before logging in.', 401);
+    }
+
     // Generate tokens
     const { accessToken, refreshToken } = generateTokens(user._id);
 
