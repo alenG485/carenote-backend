@@ -75,7 +75,6 @@ const sessionSchema = new mongoose.Schema({
 sessionSchema.index({ user_id: 1, created_at: -1 }); // For recent sessions queries
 sessionSchema.index({ user_id: 1, status: 1 }); // For status-based queries
 sessionSchema.index({ created_at: -1 }); // For date-based queries
-sessionSchema.index({ corti_interaction_id: 1 }); // For Corti ID lookups
 
 // Method to end the session
 sessionSchema.methods.endSession = function() {
