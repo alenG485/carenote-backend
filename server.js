@@ -210,6 +210,15 @@ const gracefulShutdown = async (signal) => {
     await disconnectDB();
     logger.info('Database connection closed.');
     
+    // Cleanup PDF service
+    try {
+      const pdfService = require('./src/services/pdfService');
+      await pdfService.shutdown();
+      logger.info('PDF service cleaned up.');
+    } catch (pdfError) {
+      logger.error('Error cleaning up PDF service:', pdfError);
+    }
+    
     // Close server
     server.close(() => {
       logger.info('HTTP server closed.');

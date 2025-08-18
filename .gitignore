@@ -136,6 +136,7 @@ Thumbs.db
 # Temporary files
 tmp/
 temp/
+*.tmp
 
 # Upload directories (if any)
 uploads/
@@ -171,3 +172,6 @@ coverage/
 # Build artifacts
 build/
 dist/ 
+
+# PDF test files
+test-*.pdf 

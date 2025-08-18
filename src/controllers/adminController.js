@@ -1,6 +1,7 @@
+const { validationResult } = require('express-validator');
 const User = require('../models/User');
-const Company = require('../models/Company');
 const Subscription = require('../models/Subscription');
+const Company = require('../models/Company');
 const { successResponse, errorResponse } = require('../utils/responses');
 const emailService = require('../services/emailService');
 
@@ -175,7 +176,7 @@ const getAllCompanies = async (req, res) => {
 };
 
 /**
- * Send invoice with email
+ * Send invoice with email and PDF attachment
  * POST /api/admin/users/:id/send-invoice
  */
 const sendInvoice = async (req, res) => {
@@ -205,7 +206,8 @@ const sendInvoice = async (req, res) => {
       invoice_date: new Date(invoice_date),
       amount: parseFloat(amount),
       description: description || 'CareNote Subscription',
-      created_by: req.user._id, status: 'pending',
+      created_by: req.user._id,
+      status: 'pending',
       
       banking_details: {
         account_name: 'CareNote ApS',
@@ -219,20 +221,28 @@ const sendInvoice = async (req, res) => {
     // Generate invoice HTML
     const invoiceHTML = generateInvoiceHTML(invoiceData);
 
-    // Send email with invoice
+    // Send email with invoice and PDF attachment
     try {
-      await emailService.sendInvoiceEmail({
+      const emailResult = await emailService.sendInvoiceEmail({
         to: user.email,
         subject: `Faktura ${invoice_number} - CareNote`,
         invoiceData: invoiceData,
         invoiceHTML: invoiceHTML
       });
 
-      console.log('Invoice email sent successfully to:', user.email);
+      console.log('Invoice email sent successfully to:', user.email, {
+        hasPdfAttachment: emailResult.hasPdfAttachment
+      });
 
       return successResponse(res, {
         invoice: invoiceData,
-        message: 'Invoice created and sent successfully via email'
+        email_result: {
+          messageId: emailResult.messageId,
+          hasPdfAttachment: emailResult.hasPdfAttachment
+        },
+        message: emailResult.hasPdfAttachment 
+          ? 'Invoice created and sent successfully via email with PDF attachment'
+          : 'Invoice created and sent successfully via email (PDF generation failed)'
       }, 'Invoice sent successfully');
 
     } catch (emailError) {
@@ -253,6 +263,15 @@ const sendInvoice = async (req, res) => {
   }
 };
 
+// Brand colors matching the application theme
+const BRAND_COLORS = {
+  primary: '#00A19D',
+  primaryLight: '#7FD1AE',
+  primaryDark: '#005F5E',
+  secondary: '#E8F9F8',
+  accent: '#B4E7E4'
+};
+
 // Generate invoice HTML
 const generateInvoiceHTML = (invoiceData) => {
   return `
@@ -262,44 +281,54 @@ const generateInvoiceHTML = (invoiceData) => {
       <meta charset="utf-8">
       <title>Invoice ${invoiceData.invoice_number}</title>
       <style>
+        @media print {
+          body { margin: 0; padding: 0; }
+          .invoice-container { box-shadow: none; }
+        }
+        
         body { 
           font-family: Arial, sans-serif; 
           margin: 0; 
-          padding: 20px; 
-          background-color: #f8f9fa;
+          padding: 10px; 
+          background-color: ${BRAND_COLORS.secondary} !important;
+          line-height: 1.4;
+          font-size: 12px;
         }
         .invoice-container {
           max-width: 800px;
           margin: 0 auto;
-          background-color: white;
-          padding: 40px;
+          background-color: white !important;
+          padding: 25px;
           border-radius: 8px;
           box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
         .invoice-header { 
           text-align: center; 
-          margin-bottom: 40px; 
-          border-bottom: 2px solid #e9ecef;
-          padding-bottom: 20px;
+          margin-bottom: 25px; 
+          border-bottom: 2px solid ${BRAND_COLORS.primary} !important;
+          padding-bottom: 15px;
         }
         .invoice-header h1 {
-          color: #2c3e50;
+          color: ${BRAND_COLORS.primary} !important;
           margin: 0;
-          font-size: 28px;
+          font-size: 24px;
+          font-weight: bold;
         }
         .invoice-header h2 {
-          color: #7f8c8d;
-          margin: 10px 0;
-          font-size: 18px;
+          color: ${BRAND_COLORS.primaryDark} !important;
+          margin: 8px 0;
+          font-size: 16px;
           font-weight: normal;
         }
         .invoice-details { 
-          margin-bottom: 30px; 
+          margin-bottom: 20px; 
           display: flex;
           justify-content: space-between;
+          flex-wrap: wrap;
         }
         .bill-to, .invoice-info {
           flex: 1;
+          min-width: 250px;
         }
         .invoice-info {
           text-align: right;
@@ -307,49 +336,74 @@ const generateInvoiceHTML = (invoiceData) => {
         .invoice-table { 
           width: 100%; 
           border-collapse: collapse; 
-          margin-bottom: 30px; 
+          margin-bottom: 20px; 
+          font-size: 11px;
         }
         .invoice-table th, .invoice-table td { 
           border: 1px solid #dee2e6; 
-          padding: 15px; 
+          padding: 10px; 
           text-align: left; 
         }
         .invoice-table th { 
-          background-color: #f8f9fa; 
+          background-color: ${BRAND_COLORS.secondary} !important; 
           font-weight: 600;
-          color: #495057;
+          color: ${BRAND_COLORS.primaryDark} !important;
         }
         .total-row { 
           font-weight: bold; 
-          background-color: #f8f9fa;
+          background-color: ${BRAND_COLORS.secondary} !important;
         }
         .banking-details { 
-          background-color: #f8f9fa; 
-          padding: 25px; 
+          background-color: ${BRAND_COLORS.secondary} !important; 
+          padding: 15px; 
           border-radius: 8px; 
-          margin-top: 30px; 
-          border-left: 4px solid #007bff;
+          margin-top: 20px; 
+          border-left: 4px solid ${BRAND_COLORS.primary} !important;
+          font-size: 11px;
         }
         .banking-details h3 {
           margin-top: 0;
-          color: #495057;
+          margin-bottom: 10px;
+          color: ${BRAND_COLORS.primaryDark} !important;
+          font-size: 14px;
         }
         .banking-details p {
-          margin: 8px 0;
-          color: #6c757d;
+          margin: 5px 0;
+          color: ${BRAND_COLORS.primaryDark} !important;
         }
         .footer { 
-          margin-top: 40px; 
+          margin-top: 20px; 
           text-align: center; 
-          color: #6c757d; 
-          font-size: 14px; 
+          color: ${BRAND_COLORS.primaryDark} !important; 
+          font-size: 11px; 
           border-top: 1px solid #dee2e6;
-          padding-top: 20px;
+          padding-top: 15px;
         }
         .amount {
-          font-size: 18px;
+          font-size: 14px;
           font-weight: bold;
-          color: #28a745;
+          color: ${BRAND_COLORS.primary} !important;
+        }
+        .invoice-number {
+          font-size: 14px;
+          font-weight: bold;
+          color: ${BRAND_COLORS.primaryDark} !important;
+        }
+        .company-info {
+          margin-bottom: 15px;
+          text-align: center;
+        }
+        .company-info p {
+          margin: 3px 0;
+          color: ${BRAND_COLORS.primaryDark} !important;
+          font-size: 11px;
+        }
+        h3 {
+          margin: 0 0 8px 0;
+          font-size: 14px;
+        }
+        p {
+          margin: 5px 0;
         }
       </style>
     </head>
@@ -358,7 +412,12 @@ const generateInvoiceHTML = (invoiceData) => {
         <div class="invoice-header">
           <h1>CareNote</h1>
           <h2>INVOICE</h2>
-          <p><strong>Invoice #:</strong> ${invoiceData.invoice_number}</p>
+          <div class="company-info">
+            <p>CareNote ApS</p>
+            <p>Healthcare Documentation Platform</p>
+            <p>Email: billing@carenote.dk</p>
+          </div>
+          <p class="invoice-number">Invoice #: ${invoiceData.invoice_number}</p>
         </div>
         
         <div class="invoice-details">
@@ -369,6 +428,7 @@ const generateInvoiceHTML = (invoiceData) => {
           </div>
           <div class="invoice-info">
             <p><strong>Invoice Date:</strong> ${new Date(invoiceData.invoice_date).toLocaleDateString('da-DK')}</p>
+            <p><strong>Due Date:</strong> ${new Date(new Date(invoiceData.invoice_date).getTime() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('da-DK')}</p>
           </div>
         </div>
         
@@ -404,6 +464,7 @@ const generateInvoiceHTML = (invoiceData) => {
         <div class="footer">
           <p>Thank you for choosing CareNote!</p>
           <p>For questions about this invoice, please contact us at billing@carenote.dk</p>
+          <p><small>This invoice is generated automatically. Please include the invoice number as reference when making payment.</small></p>
         </div>
       </div>
     </body>
