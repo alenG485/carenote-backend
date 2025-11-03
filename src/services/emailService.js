@@ -718,6 +718,118 @@ class EmailService {
       }
     }
   }
+
+  /**
+   * Generate contact form email template
+   */
+  generateContactEmailTemplate(contactData) {
+    const { name, email, subject, message } = contactData;
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Ny kontakthenvendelse - ${this.companyName}</title>
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { text-align: center; padding: 30px 0; border-bottom: 2px solid ${this.colors.primary} !important; }
+          .logo { font-size: 32px; font-weight: 300; color: #333; }
+          .logo span { font-weight: 600; color: ${this.colors.primary} !important; }
+          .content { padding: 40px 0; }
+          .info-box { background-color: ${this.colors.secondary} !important; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid ${this.colors.primary} !important; }
+          .message-box { background-color: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0; border: 1px solid #e5e7eb; }
+          .footer { border-top: 1px solid #eee; padding: 20px 0; font-size: 14px; color: #666; text-align: center; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <div class="logo">Care<span>Note</span></div>
+          </div>
+          
+          <div class="content">
+            <h1>Ny kontakthenvendelse</h1>
+            
+            <div class="info-box">
+              <p><strong>Fra:</strong> ${name}</p>
+              <p><strong>Email:</strong> ${email}</p>
+              <p><strong>Emne:</strong> ${subject}</p>
+            </div>
+            
+            <h2>Besked:</h2>
+            <div class="message-box">
+              <p style="white-space: pre-wrap;">${message}</p>
+            </div>
+          </div>
+          
+          <div class="footer">
+            <p>&copy; ${new Date().getFullYear()} ${this.companyName}. Alle rettigheder forbeholdes.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const text = `
+      Ny kontakthenvendelse - ${this.companyName}
+      
+      Fra: ${name}
+      Email: ${email}
+      Emne: ${subject}
+      
+      Besked:
+      ${message}
+    `;
+
+    return { html, text };
+  }
+
+  /**
+   * Send contact form email
+   */
+  async sendContactEmail(contactData) {
+    try {
+      if (!this.isConfigured()) {
+        this.logger.error('Resend API key not configured');
+        throw new Error('Email service not configured');
+      }
+
+      const { name, email, subject, message } = contactData;
+      const { html, text } = this.generateContactEmailTemplate(contactData);
+
+      const result = await this.resend.emails.send({
+        from: this.fromEmail,
+        to: 'kontakt@carenote.dk',
+        replyTo: email,
+        subject: `Kontakthenvendelse: ${subject}`,
+        html,
+        text,
+        tags: [
+          { name: 'category', value: 'contact' },
+          { name: 'source', value: 'contact_form' }
+        ]
+      });
+
+      this.logger.info('Contact email sent successfully', { 
+        from: email,
+        name,
+        subject,
+        messageId: result.data?.id
+      });
+
+      return { success: true, messageId: result.data?.id };
+
+    } catch (error) {
+      this.logger.error('Failed to send contact email', { 
+        from: contactData.email, 
+        error: error.message
+      });
+      throw error;
+    }
+  }
 }
 
 module.exports = new EmailService(); 

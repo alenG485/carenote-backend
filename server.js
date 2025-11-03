@@ -137,6 +137,7 @@ app.use('/api/templates', require('./src/routes/templates'));
 app.use('/api/subscriptions', require('./src/routes/subscriptions'));
 app.use('/api/admin', require('./src/routes/admin'));
 app.use('/api/clinic', require('./src/routes/clinic'));
+app.use('/api/contact', require('./src/routes/contact'));
 
 // 404 handler
 app.use('*', (req, res) => {
