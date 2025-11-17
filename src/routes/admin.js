@@ -92,4 +92,15 @@ router.get('/companies',
   adminController.getAllCompanies
 );
 
+/**
+ * @route   GET /api/admin/leads
+ * @desc    Get all leads with pagination and user registration status
+ * @access  Private (Super Admin only)
+ */
+router.get('/leads', 
+  authenticate, 
+  requireSuperAdmin,
+  adminController.getAllLeads
+);
+
 module.exports = router; 

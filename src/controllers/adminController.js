@@ -2,6 +2,7 @@ const { validationResult } = require('express-validator');
 const User = require('../models/User');
 const Subscription = require('../models/Subscription');
 const Company = require('../models/Company');
+const Lead = require('../models/Lead');
 const { successResponse, errorResponse } = require('../utils/responses');
 const emailService = require('../services/emailService');
 
@@ -631,6 +632,77 @@ const getUserDetails = async (req, res) => {
   }
 };
 
+/**
+ * Get all leads with pagination
+ * GET /api/admin/leads
+ */
+const getAllLeads = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+
+    // Get leads with pagination
+    const leads = await Lead.find()
+      .sort({ created_at: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    const totalLeads = await Lead.countDocuments();
+    const totalPages = Math.ceil(totalLeads / limit);
+
+    // Check which leads have become users
+    const leadEmails = leads.map(lead => lead.email);
+    const users = await User.find({ email: { $in: leadEmails } })
+      .select('email name role created_at')
+      .lean();
+
+    // Create a map of email to user for quick lookup
+    const userMap = {};
+    users.forEach(user => {
+      userMap[user.email] = {
+        id: user._id,
+        name: user.name,
+        role: user.role,
+        created_at: user.created_at,
+        is_registered: true
+      };
+    });
+
+    // Format leads with user registration status
+    const formattedLeads = leads.map(lead => ({
+      id: lead._id,
+      email: lead.email,
+      marketing_opt_in: lead.marketing_opt_in,
+      created_at: lead.created_at,
+      updated_at: lead.updated_at,
+      user: userMap[lead.email] || { is_registered: false }
+    }));
+
+    return successResponse(res, {
+      leads: formattedLeads,
+      pagination: {
+        current_page: page,
+        total_pages: totalPages,
+        total_leads: totalLeads,
+        has_next: page < totalPages,
+        has_prev: page > 1
+      },
+      stats: {
+        total_leads: totalLeads,
+        registered_users: users.length,
+        unregistered_leads: totalLeads - users.length,
+        marketing_opt_in: await Lead.countDocuments({ marketing_opt_in: true })
+      }
+    }, 'Leads hentet succesfuldt');
+
+  } catch (error) {
+    console.error('Get all leads error:', error);
+    return errorResponse(res, 'Kunne ikke hente leads', 500);
+  }
+};
+
 module.exports = {
   getAllUsers,
   getAnalytics,
@@ -638,5 +710,6 @@ module.exports = {
   sendInvoice,
   markSubscription,
   getUserDetails,
-  deleteUser
+  deleteUser,
+  getAllLeads
 }; 

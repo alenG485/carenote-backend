@@ -25,7 +25,6 @@ const leadSchema = new mongoose.Schema(
 );
 
 leadSchema.index({ email: 1 });
-leadSchema.index({ source: 1 });
 
 module.exports = mongoose.model('Lead', leadSchema);
 
