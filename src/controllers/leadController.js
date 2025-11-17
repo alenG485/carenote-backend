@@ -34,7 +34,6 @@ const createLead = async (req, res) => {
     }
 
     // check if lead already exists
-    // Email is already normalized (lowercased) by validation middleware
     const existingLead = await Lead.findOne({ email });
     if (existingLead) {
       return successResponse(res, { email: existingLead.email, marketing_opt_in: existingLead.marketing_opt_in }, 'Lead er allerede registreret', 200);
