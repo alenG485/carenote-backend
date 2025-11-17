@@ -53,11 +53,11 @@ const startSession = async (req, res) => {
 
     return successResponse(res, {
       session: savedSession
-    }, 'Session started successfully', 201);
+    }, 'Session startet succesfuldt', 201);
 
   } catch (error) {
     console.error('Start session error:', error);
-    return errorResponse(res, error.message || 'Failed to start session', 500);
+    return errorResponse(res, error.message || 'Kunne ikke starte session', 500);
   }
 };
 
@@ -76,16 +76,16 @@ const getSession = async (req, res) => {
     });
 
     if (!session) {
-      return errorResponse(res, 'Active session not found', 404);
+      return errorResponse(res, 'Aktiv session ikke fundet', 404);
     }
 
     return successResponse(res, {
       session: session
-    }, 'Session retrieved successfully');
+    }, 'Session hentet succesfuldt');
 
   } catch (error) {
     console.error('Get WebSocket URL error:', error);
-    return errorResponse(res, 'Failed to get WebSocket URL', 500);
+    return errorResponse(res, 'Kunne ikke hente WebSocket URL', 500);
   }
 };
 
@@ -104,7 +104,7 @@ const getSessionFacts = async (req, res) => {
     });
 
     if (!session) {
-      return errorResponse(res, 'Session not found', 404);
+      return errorResponse(res, 'Session ikke fundet', 404);
     }
 
     // Fetch facts directly from Corti API
@@ -114,11 +114,11 @@ const getSessionFacts = async (req, res) => {
       facts: facts,
       session_id: sessionId,
       interaction_id: session.corti_interaction_id
-    }, 'Facts retrieved successfully');
+    }, 'Fakta hentet succesfuldt');
 
   } catch (error) {
     console.error('Get session facts error:', error);
-    return errorResponse(res, 'Failed to get session facts', 500);
+    return errorResponse(res, 'Kunne ikke hente session fakta', 500);
   }
 };
 
@@ -142,7 +142,7 @@ const addFact = async (req, res) => {
     });
 
     if (!session) {
-      return errorResponse(res, 'Session not found', 404);
+      return errorResponse(res, 'Session ikke fundet', 404);
     }
 
     // Add fact via Corti API
@@ -155,11 +155,11 @@ const addFact = async (req, res) => {
     return successResponse(res, {
       fact: result,
       session_id: sessionId
-    }, 'Fact added successfully');
+    }, 'Fakta tilføjet succesfuldt');
 
   } catch (error) {
     console.error('Add fact error:', error);
-    return errorResponse(res, 'Failed to add fact', 500);
+    return errorResponse(res, 'Kunne ikke tilføje fakta', 500);
   }
 };
 
@@ -179,7 +179,7 @@ const updateFact = async (req, res) => {
     });
 
     if (!session) {
-      return errorResponse(res, 'Session not found', 404);
+      return errorResponse(res, 'Session ikke fundet', 404);
     }
 
     // Update fact via Corti API
@@ -192,11 +192,11 @@ const updateFact = async (req, res) => {
     return successResponse(res, {
       fact: result,
       session_id: sessionId
-    }, 'Fact updated successfully');
+    }, 'Fakta opdateret succesfuldt');
 
   } catch (error) {
     console.error('Update fact error:', error);
-    return errorResponse(res, 'Failed to update fact', 500);
+    return errorResponse(res, 'Kunne ikke opdatere fakta', 500);
   }
 };
 
@@ -215,7 +215,7 @@ const startSessionRecording = async (req, res) => {
     });
 
     if (!session) {
-      return errorResponse(res, 'Active session not found', 404);
+      return errorResponse(res, 'Aktiv session ikke fundet', 404);
     }
 
     // Update session status to started
@@ -224,11 +224,11 @@ const startSessionRecording = async (req, res) => {
 
     return successResponse(res, {
       session: session
-    }, 'Session recording started successfully');
+    }, 'Session optagelse startet succesfuldt');
 
   } catch (error) {
     console.error('Start session recording error:', error);
-    return errorResponse(res, 'Failed to start session recording', 500);
+    return errorResponse(res, 'Kunne ikke starte session optagelse', 500);
   }
 };
 
@@ -246,7 +246,7 @@ const endSession = async (req, res) => {
     });
 
     if (!session) {
-      return errorResponse(res, 'Active session not found', 404);
+      return errorResponse(res, 'Aktiv session ikke fundet', 404);
     }
 
     // End the session
@@ -255,11 +255,11 @@ const endSession = async (req, res) => {
 
     return successResponse(res, {
       session: session
-    }, 'Session ended successfully');
+    }, 'Session afsluttet succesfuldt');
 
   } catch (error) {
     console.error('End session error:', error);
-    return errorResponse(res, 'Failed to end session', 500);
+    return errorResponse(res, 'Kunne ikke afslutte session', 500);
   }
 };
 
@@ -286,7 +286,7 @@ const getUserSessions = async (req, res) => {
         // Verify the user belongs to the company admin's company
         const targetUser = await User.findById(user_id);
         if (!targetUser || targetUser.company_id?.toString() !== req.user.company_id?.toString()) {
-          return errorResponse(res, 'Access denied to this user\'s sessions', 403);
+          return errorResponse(res, 'Adgang nægtet til denne brugers sessions', 403);
         }
         query.user_id = user_id;
       } else {
@@ -340,11 +340,11 @@ const getUserSessions = async (req, res) => {
         total_sessions: total,
         limit: parseInt(limit)
       }
-    }, 'Sessions retrieved successfully');
+    }, 'Sessions hentet succesfuldt');
 
   } catch (error) {
     console.error('Get user sessions error:', error);
-    return errorResponse(res, 'Failed to get sessions', 500);
+    return errorResponse(res, 'Kunne ikke hente sessions', 500);
   }
 };
 
@@ -358,7 +358,7 @@ const getCompanySessions = async (req, res) => {
 
     // Only company admins and super admins can access this
     if (req.user.role !== 'company_admin' && req.user.role !== 'super_admin') {
-      return errorResponse(res, 'Company admin access required', 403);
+      return errorResponse(res, 'Virksomhedsadministrator adgang påkrævet', 403);
     }
 
     let companyId = req.user.company_id;
@@ -369,7 +369,7 @@ const getCompanySessions = async (req, res) => {
     }
 
     if (!companyId) {
-      return errorResponse(res, 'Company ID required', 400);
+      return errorResponse(res, 'Virksomheds ID påkrævet', 400);
     }
 
     // Calculate date filter
@@ -426,11 +426,11 @@ const getCompanySessions = async (req, res) => {
       total_users: companyUsers.length,
       total_sessions: sessions.length,
       date_range: `${days} days`
-    }, 'Company sessions retrieved successfully');
+    }, 'Virksomheds sessions hentet succesfuldt');
 
   } catch (error) {
     console.error('Get company sessions error:', error);
-    return errorResponse(res, 'Failed to get company sessions', 500);
+    return errorResponse(res, 'Kunne ikke hente virksomheds sessions', 500);
   }
 };
 
@@ -464,7 +464,7 @@ const getRecentSessions = async (req, res) => {
         // Verify the user belongs to the company admin's company
         const targetUser = await User.findById(user_id);
         if (!targetUser || targetUser.company_id?.toString() !== req.user.company_id?.toString()) {
-          return errorResponse(res, 'Access denied to this user\'s sessions', 403);
+          return errorResponse(res, 'Adgang nægtet til denne brugers sessions', 403);
         }
         query.user_id = user_id;
       } else {
@@ -495,11 +495,11 @@ const getRecentSessions = async (req, res) => {
     return successResponse(res, {
       sessions: sessionStats,
       total_sessions: sessionStats.length
-    }, 'Recent sessions retrieved successfully');
+    }, 'Seneste sessions hentet succesfuldt');
 
   } catch (error) {
     console.error('Get recent sessions error:', error);
-    return errorResponse(res, 'Failed to get recent sessions', 500);
+    return errorResponse(res, 'Kunne ikke hente seneste sessions', 500);
   }
 };
 
@@ -518,7 +518,7 @@ const deleteSession = async (req, res) => {
     });
 
     if (!session) {
-      return errorResponse(res, 'Session not found', 404);
+      return errorResponse(res, 'Session ikke fundet', 404);
     }
 
     // Soft delete the session
@@ -527,11 +527,11 @@ const deleteSession = async (req, res) => {
 
     return successResponse(res, {
       session_id: sessionId
-    }, 'Session deleted successfully');
+    }, 'Session slettet succesfuldt');
 
   } catch (error) {
     console.error('Delete session error:', error);
-    return errorResponse(res, 'Failed to delete session', 500);
+    return errorResponse(res, 'Kunne ikke slette session', 500);
   }
 };
 
@@ -568,11 +568,11 @@ const getFactGroups = async (req, res) => {
     return successResponse(res, {
       factGroups: processedGroups,
       language: language
-    }, 'Fact groups retrieved successfully');
+    }, 'Fakta grupper hentet succesfuldt');
 
   } catch (error) {
     console.error('Get fact groups error:', error);
-    return errorResponse(res, 'Failed to get fact groups', 500);
+    return errorResponse(res, 'Kunne ikke hente fakta grupper', 500);
   }
 };
 

@@ -64,11 +64,11 @@ const getAllUsers = async (req, res) => {
         has_next: page < totalPages,
         has_prev: page > 1
       }
-    }, 'Users fetched successfully');
+    }, 'Brugere hentet succesfuldt');
 
   } catch (error) {
     console.error('Get all users error:', error);
-    return errorResponse(res, 'Failed to fetch users', 500);
+    return errorResponse(res, 'Kunne ikke hente brugere', 500);
   }
 };
 
@@ -113,11 +113,11 @@ const getAnalytics = async (req, res) => {
       recent_activity: {
         new_registrations_7_days: recentRegistrations
       }
-    }, 'Analytics fetched successfully');
+    }, 'Analytics hentet succesfuldt');
 
   } catch (error) {
     console.error('Get analytics error:', error);
-    return errorResponse(res, 'Failed to fetch analytics', 500);
+    return errorResponse(res, 'Kunne ikke hente analytics', 500);
   }
 };
 
@@ -167,11 +167,11 @@ const getAllCompanies = async (req, res) => {
         has_next: page < totalPages,
         has_prev: page > 1
       }
-    }, 'Companies fetched successfully');
+    }, 'Virksomheder hentet succesfuldt');
 
   } catch (error) {
     console.error('Get all companies error:', error);
-    return errorResponse(res, 'Failed to fetch companies', 500);
+    return errorResponse(res, 'Kunne ikke hente virksomheder', 500);
   }
 };
 
@@ -185,17 +185,17 @@ const sendInvoice = async (req, res) => {
     const { invoice_date, amount, description, invoice_number } = req.body;
 
     if (!invoice_date || !amount || !invoice_number) {
-      return errorResponse(res, 'Invoice date, amount, and invoice number are required', 400);
+      return errorResponse(res, 'Fakturadato, beløb og fakturanummer er påkrævet', 400);
     }
 
     const user = await User.findById(userId);
     if (!user) {
-      return errorResponse(res, 'User not found', 404);
+      return errorResponse(res, 'Bruger ikke fundet', 404);
     }
 
     // Don't allow sending invoices to super admin
     if (user.role === 'super_admin') {
-      return errorResponse(res, 'Cannot send invoice to super admin', 400);
+      return errorResponse(res, 'Kan ikke sende faktura til super administrator', 400);
     }
 
     const invoiceData = {
@@ -241,9 +241,9 @@ const sendInvoice = async (req, res) => {
           hasPdfAttachment: emailResult.hasPdfAttachment
         },
         message: emailResult.hasPdfAttachment 
-          ? 'Invoice created and sent successfully via email with PDF attachment'
-          : 'Invoice created and sent successfully via email (PDF generation failed)'
-      }, 'Invoice sent successfully');
+          ? 'Faktura oprettet og sendt succesfuldt via e-mail med PDF vedhæftning'
+          : 'Faktura oprettet og sendt succesfuldt via e-mail (PDF generering fejlede)'
+      }, 'Faktura sendt succesfuldt');
 
     } catch (emailError) {
       console.error('Email sending failed:', emailError);
@@ -251,9 +251,9 @@ const sendInvoice = async (req, res) => {
       // Still return success but log the email error
       return successResponse(res, {
         invoice: invoiceData,
-        message: 'Invoice created but email sending failed',
+        message: 'Faktura oprettet, men e-mail sending fejlede',
         email_error: emailError.message
-      }, 'Invoice created but email failed');
+      }, 'Faktura oprettet, men e-mail fejlede');
 
     }
 
@@ -411,32 +411,32 @@ const generateInvoiceHTML = (invoiceData) => {
       <div class="invoice-container">
         <div class="invoice-header">
           <h1>CareNote</h1>
-          <h2>INVOICE</h2>
+          <h2>FAKTURA</h2>
           <div class="company-info">
             <p>CareNote ApS</p>
             <p>Healthcare Documentation Platform</p>
             <p>Email: kontakt@carenote.dk</p>
           </div>
-          <p class="invoice-number">Invoice #: ${invoiceData.invoice_number}</p>
+          <p class="invoice-number">Faktura #: ${invoiceData.invoice_number}</p>
         </div>
         
         <div class="invoice-details">
           <div class="bill-to">
-            <h3>Bill To:</h3>
+            <h3>Faktureres til:</h3>
             <p><strong>${invoiceData.user_name}</strong><br>
             ${invoiceData.user_email}</p>
           </div>
           <div class="invoice-info">
-            <p><strong>Invoice Date:</strong> ${new Date(invoiceData.invoice_date).toLocaleDateString('da-DK')}</p>
-            <p><strong>Due Date:</strong> ${new Date(new Date(invoiceData.invoice_date).getTime() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('da-DK')}</p>
+            <p><strong>Fakturadato:</strong> ${new Date(invoiceData.invoice_date).toLocaleDateString('da-DK')}</p>
+            <p><strong>Forfaldsdato:</strong> ${new Date(new Date(invoiceData.invoice_date).getTime() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString('da-DK')}</p>
           </div>
         </div>
         
         <table class="invoice-table">
           <thead>
             <tr>
-              <th>Description</th>
-              <th style="text-align: right;">Amount</th>
+              <th>Beskrivelse</th>
+              <th style="text-align: right;">Beløb</th>
             </tr>
           </thead>
           <tbody>
@@ -445,26 +445,26 @@ const generateInvoiceHTML = (invoiceData) => {
               <td style="text-align: right;" class="amount">${invoiceData.amount.toFixed(2)} DKK</td>
             </tr>
             <tr class="total-row">
-              <td><strong>Total</strong></td>
+              <td><strong>I alt</strong></td>
               <td style="text-align: right;" class="amount"><strong>${invoiceData.amount.toFixed(2)} DKK</strong></td>
             </tr>
           </tbody>
         </table>
         
         <div class="banking-details">
-          <h3>Banking Details</h3>
-          <p><strong>Account Name:</strong> ${invoiceData.banking_details.account_name}</p>
+          <h3>Betalingsoplysninger</h3>
+          <p><strong>Kontonavn:</strong> ${invoiceData.banking_details.account_name}</p>
           <p><strong>Bank:</strong> ${invoiceData.banking_details.bank}</p>
-          <p><strong>Account Number:</strong> ${invoiceData.banking_details.account_number}</p>
+          <p><strong>Kontonummer:</strong> ${invoiceData.banking_details.account_number}</p>
           <p><strong>IBAN:</strong> ${invoiceData.banking_details.iban}</p>
           <p><strong>SWIFT/BIC:</strong> ${invoiceData.banking_details.swift_bic}</p>
           <p><strong>Reference:</strong> ${invoiceData.invoice_number}</p>
         </div>
         
         <div class="footer">
-          <p>Thank you for choosing CareNote!</p>
-          <p>For questions about this invoice, please contact us at kontakt@carenote.dk</p>
-          <p><small>This invoice is generated automatically. Please include the invoice number as reference when making payment.</small></p>
+          <p>Tak fordi du valgte CareNote!</p>
+          <p>For spørgsmål om denne faktura, kontakt os venligst på kontakt@carenote.dk</p>
+          <p><small>Denne faktura er genereret automatisk. Inkluder venligst fakturanummeret som reference ved betaling.</small></p>
         </div>
       </div>
     </body>
@@ -482,17 +482,17 @@ const markSubscription = async (req, res) => {
     const { access_date, expiry_date, plan_name, billing_amount, billing_interval, status } = req.body;
 
     if (!access_date || !expiry_date || !plan_name || !billing_amount || !billing_interval || !status) {
-      return errorResponse(res, 'Access date, expiry date, plan name, billing amount, billing interval, and status are required', 400);
+      return errorResponse(res, 'Adgangsdato, udløbsdato, plan navn, faktureringsbeløb, faktureringsinterval og status er påkrævet', 400);
     }
 
     const user = await User.findById(userId);
     if (!user) {
-      return errorResponse(res, 'User not found', 404);
+      return errorResponse(res, 'Bruger ikke fundet', 404);
     }
 
     // Don't allow modifying super admin subscriptions
     if (user.role === 'super_admin') {
-      return errorResponse(res, 'Cannot modify super admin subscription', 400);
+      return errorResponse(res, 'Kan ikke ændre super administrator abonnement', 400);
     }
 
     const accessDate = new Date(access_date);
@@ -533,12 +533,12 @@ const markSubscription = async (req, res) => {
         billing_amount: subscription.billing_amount,
         billing_interval: subscription.billing_interval
       },
-      message: 'Subscription marked successfully'
-    }, 'Subscription updated successfully');
+      message: 'Abonnement markeret succesfuldt'
+    }, 'Abonnement opdateret succesfuldt');
 
   } catch (error) {
     console.error('Mark subscription error:', error);
-    return errorResponse(res, 'Failed to mark subscription', 500);
+      return errorResponse(res, 'Kunne ikke markere abonnement', 500);
   }
 };
 
@@ -552,12 +552,12 @@ const deleteUser = async (req, res) => {
 
     const user = await User.findById(userId);
     if (!user) {
-      return errorResponse(res, 'User not found', 404);
+      return errorResponse(res, 'Bruger ikke fundet', 404);
     }
 
     // Don't allow deleting super admin users
     if (user.role === 'super_admin') {
-      return errorResponse(res, 'Cannot delete super admin user', 400);
+      return errorResponse(res, 'Kan ikke slette super administrator bruger', 400);
     }
 
     // Delete user's subscription if exists
@@ -569,12 +569,12 @@ const deleteUser = async (req, res) => {
     await User.findByIdAndDelete(userId);
 
     return successResponse(res, {
-      message: 'User deleted successfully'
-    }, 'User deleted successfully');
+      message: 'Bruger slettet succesfuldt'
+    }, 'Bruger slettet succesfuldt');
 
   } catch (error) {
     console.error('Delete user error:', error);
-    return errorResponse(res, 'Failed to delete user', 500);
+    return errorResponse(res, 'Kunne ikke slette bruger', 500);
   }
 };
 
@@ -592,12 +592,12 @@ const getUserDetails = async (req, res) => {
       .select('-password');
 
     if (!user) {
-      return errorResponse(res, 'User not found', 404);
+      return errorResponse(res, 'Bruger ikke fundet', 404);
     }
 
     // Don't allow viewing super admin details
     if (user.role === 'super_admin') {
-      return errorResponse(res, 'Cannot view super admin details', 403);
+      return errorResponse(res, 'Kan ikke se super administrator detaljer', 403);
     }
 
     const userData = {
@@ -623,11 +623,11 @@ const getUserDetails = async (req, res) => {
       } : null
     };
 
-    return successResponse(res, userData, 'User details fetched successfully');
+    return successResponse(res, userData, 'Bruger detaljer hentet succesfuldt');
 
   } catch (error) {
     console.error('Get user details error:', error);
-    return errorResponse(res, 'Failed to fetch user details', 500);
+    return errorResponse(res, 'Kunne ikke hente bruger detaljer', 500);
   }
 };
 

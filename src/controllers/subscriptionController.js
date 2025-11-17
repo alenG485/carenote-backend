@@ -20,13 +20,13 @@ const getCurrentSubscription = async (req, res) => {
     }).populate('user_id', 'name email');
 
     if (!subscription) {
-      return errorResponse(res, 'No subscription found', 404);
+      return errorResponse(res, 'Intet abonnement fundet', 404);
     }
 
-    return successResponse(res, { subscription }, 'Current subscription retrieved successfully');
+    return successResponse(res, { subscription }, 'Nuværende abonnement hentet succesfuldt');
   } catch (error) {
     console.error('Get current subscription error:', error);
-    return errorResponse(res, 'Failed to get current subscription', 500);
+    return errorResponse(res, 'Kunne ikke hente nuværende abonnement', 500);
   }
 };
 
@@ -38,7 +38,7 @@ const createSubscription = async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return errorResponse(res, 'Validation failed', 400, errors.array());
+      return errorResponse(res, 'Validering fejlede', 400, errors.array());
     }
 
     const { plan_name, billing_amount, billing_interval, trial_days } = req.body;
@@ -47,7 +47,7 @@ const createSubscription = async (req, res) => {
     const existingSubscription = await Subscription.findOne({ user_id: req.user._id });
 
     if (existingSubscription) {
-      return errorResponse(res, 'Subscription already exists', 400);
+      return errorResponse(res, 'Abonnement findes allerede', 400);
     }
 
     // Calculate trial end date
@@ -76,11 +76,11 @@ const createSubscription = async (req, res) => {
 
     return successResponse(res, {
       subscription: savedSubscription
-    }, 'Subscription created successfully', 201);
+    }, 'Abonnement oprettet succesfuldt', 201);
 
   } catch (error) {
     console.error('Create subscription error:', error);
-    return errorResponse(res, error.message || 'Failed to create subscription', 500);
+    return errorResponse(res, error.message || 'Kunne ikke oprette abonnement', 500);
   }
 };
 
@@ -92,7 +92,7 @@ const updateSubscription = async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return errorResponse(res, 'Validation failed', 400, errors.array());
+      return errorResponse(res, 'Validering fejlede', 400, errors.array());
     }
 
     const { id } = req.params;
@@ -100,12 +100,12 @@ const updateSubscription = async (req, res) => {
 
     const subscription = await Subscription.findById(id);
     if (!subscription) {
-      return errorResponse(res, 'Subscription not found', 404);
+      return errorResponse(res, 'Abonnement ikke fundet', 404);
     }
 
     // Check if user owns this subscription or is admin
     if (subscription.user_id.toString() !== req.user._id.toString() && req.user.role !== 'super_admin') {
-      return errorResponse(res, 'Not authorized to update this subscription', 403);
+      return errorResponse(res, 'Ikke autoriseret til at opdatere dette abonnement', 403);
     }
 
     // Update fields
@@ -119,11 +119,11 @@ const updateSubscription = async (req, res) => {
 
     return successResponse(res, {
       subscription: updatedSubscription
-    }, 'Subscription updated successfully');
+    }, 'Abonnement opdateret succesfuldt');
 
   } catch (error) {
     console.error('Update subscription error:', error);
-    return errorResponse(res, error.message || 'Failed to update subscription', 500);
+    return errorResponse(res, error.message || 'Kunne ikke opdatere abonnement', 500);
   }
 };
 
@@ -137,12 +137,12 @@ const cancelSubscription = async (req, res) => {
 
     const subscription = await Subscription.findById(id);
     if (!subscription) {
-      return errorResponse(res, 'Subscription not found', 404);
+      return errorResponse(res, 'Abonnement ikke fundet', 404);
     }
 
     // Check if user owns this subscription or is admin
     if (subscription.user_id.toString() !== req.user._id.toString() && req.user.role !== 'super_admin') {
-      return errorResponse(res, 'Not authorized to cancel this subscription', 403);
+      return errorResponse(res, 'Ikke autoriseret til at annullere dette abonnement', 403);
     }
 
     // Cancel subscription
@@ -151,11 +151,11 @@ const cancelSubscription = async (req, res) => {
 
     return successResponse(res, {
       subscription
-    }, 'Subscription cancelled successfully');
+    }, 'Abonnement annulleret succesfuldt');
 
   } catch (error) {
     console.error('Cancel subscription error:', error);
-    return errorResponse(res, error.message || 'Failed to cancel subscription', 500);
+    return errorResponse(res, error.message || 'Kunne ikke annullere abonnement', 500);
   }
 };
 
@@ -169,12 +169,12 @@ const reactivateSubscription = async (req, res) => {
 
     const subscription = await Subscription.findById(id);
     if (!subscription) {
-      return errorResponse(res, 'Subscription not found', 404);
+      return errorResponse(res, 'Abonnement ikke fundet', 404);
     }
 
     // Check if user owns this subscription or is admin
     if (subscription.user_id.toString() !== req.user._id.toString() && req.user.role !== 'super_admin') {
-      return errorResponse(res, 'Not authorized to reactivate this subscription', 403);
+      return errorResponse(res, 'Ikke autoriseret til at genaktivere dette abonnement', 403);
     }
 
     // Reactivate subscription
@@ -183,11 +183,11 @@ const reactivateSubscription = async (req, res) => {
 
     return successResponse(res, {
       subscription
-    }, 'Subscription reactivated successfully');
+    }, 'Abonnement genaktiveret succesfuldt');
 
   } catch (error) {
     console.error('Reactivate subscription error:', error);
-    return errorResponse(res, error.message || 'Failed to reactivate subscription', 500);
+    return errorResponse(res, error.message || 'Kunne ikke genaktivere abonnement', 500);
   }
 };
 
@@ -202,12 +202,12 @@ const extendSubscription = async (req, res) => {
 
     const subscription = await Subscription.findById(id);
     if (!subscription) {
-      return errorResponse(res, 'Subscription not found', 404);
+      return errorResponse(res, 'Abonnement ikke fundet', 404);
     }
 
     // Check if user owns this subscription or is admin
     if (subscription.user_id.toString() !== req.user._id.toString() && req.user.role !== 'super_admin') {
-      return errorResponse(res, 'Not authorized to extend this subscription', 403);
+      return errorResponse(res, 'Ikke autoriseret til at forlænge dette abonnement', 403);
     }
 
     // Extend subscription
@@ -217,11 +217,11 @@ const extendSubscription = async (req, res) => {
 
     return successResponse(res, {
       subscription
-    }, `Subscription extended by ${extensionDays} days successfully`);
+    }, `Abonnement forlænget med ${extensionDays} dage succesfuldt`);
 
   } catch (error) {
     console.error('Extend subscription error:', error);
-    return errorResponse(res, error.message || 'Failed to extend subscription', 500);
+    return errorResponse(res, error.message || 'Kunne ikke forlænge abonnement', 500);
   }
 };
 
@@ -233,7 +233,7 @@ const getAllSubscriptions = async (req, res) => {
   try {
     // Check if user is admin
     if (req.user.role !== 'super_admin') {
-      return errorResponse(res, 'Not authorized to view all subscriptions', 403);
+      return errorResponse(res, 'Ikke autoriseret til at se alle abonnementer', 403);
     }
 
     const subscriptions = await Subscription.find()
@@ -244,11 +244,11 @@ const getAllSubscriptions = async (req, res) => {
     return successResponse(res, {
       subscriptions,
       count: subscriptions.length
-    }, 'All subscriptions retrieved successfully');
+    }, 'Alle abonnementer hentet succesfuldt');
 
   } catch (error) {
     console.error('Get all subscriptions error:', error);
-    return errorResponse(res, 'Failed to get subscriptions', 500);
+    return errorResponse(res, 'Kunne ikke hente abonnementer', 500);
   }
 };
 
@@ -262,7 +262,7 @@ const getSubscriptionById = async (req, res) => {
 
     // Check if user is admin
     if (req.user.role !== 'super_admin') {
-      return errorResponse(res, 'Not authorized to view this subscription', 403);
+      return errorResponse(res, 'Ikke autoriseret til at se dette abonnement', 403);
     }
 
     const subscription = await Subscription.findById(id)
@@ -270,16 +270,16 @@ const getSubscriptionById = async (req, res) => {
       .populate('cancelled_by', 'name email');
 
     if (!subscription) {
-      return errorResponse(res, 'Subscription not found', 404);
+      return errorResponse(res, 'Abonnement ikke fundet', 404);
     }
 
     return successResponse(res, {
       subscription
-    }, 'Subscription retrieved successfully');
+    }, 'Abonnement hentet succesfuldt');
 
   } catch (error) {
     console.error('Get subscription by ID error:', error);
-    return errorResponse(res, 'Failed to get subscription', 500);
+    return errorResponse(res, 'Kunne ikke hente abonnement', 500);
   }
 };
 

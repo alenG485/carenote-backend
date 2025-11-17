@@ -13,11 +13,11 @@ const getClinicData = async (req, res) => {
     // Get user with company info
     const user = await User.findById(userId).populate('company_id');
     if (!user) {
-      return errorResponse(res, 'User not found', 404);
+      return errorResponse(res, 'Bruger ikke fundet', 404);
     }
 
     if (!user.company_id) {
-      return errorResponse(res, 'User not associated with any company', 404);
+      return errorResponse(res, 'Bruger ikke tilknyttet nogen virksomhed', 404);
     }
 
     const company = user.company_id;
@@ -59,10 +59,10 @@ const getClinicData = async (req, res) => {
       stats
     };
 
-    return successResponse(res, clinicData, 'Clinic data retrieved successfully');
+    return successResponse(res, clinicData, 'Klinik data hentet succesfuldt');
   } catch (error) {
     console.error('Error getting clinic data:', error);
-    return errorResponse(res, 'Failed to get clinic data', 500);
+    return errorResponse(res, 'Kunne ikke hente klinik data', 500);
   }
 };
 
@@ -76,13 +76,13 @@ const inviteUser = async (req, res) => {
 
     // Validate required fields
     if (!email || !name) {
-      return errorResponse(res, 'Email and name are required', 400);
+      return errorResponse(res, 'E-mail og navn er påkrævet', 400);
     }
 
     // Get current user's company
     const currentUser = await User.findById(invitedBy).populate('company_id');
     if (!currentUser || !currentUser.company_id) {
-      return errorResponse(res, 'User not associated with any company', 404);
+      return errorResponse(res, 'Bruger ikke tilknyttet nogen virksomhed', 404);
     }
 
     const company = currentUser.company_id;
@@ -90,13 +90,13 @@ const inviteUser = async (req, res) => {
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return errorResponse(res, 'User already exists', 400);
+      return errorResponse(res, 'Bruger findes allerede', 400);
     }
 
     // Check if company has reached max users
     const userCount = await User.countDocuments({ company_id: company._id });
     if (userCount >= company.max_users) {
-      return errorResponse(res, `Company has reached maximum number of users (${company.max_users})`, 400);
+      return errorResponse(res, `Virksomhed har nået maksimalt antal brugere (${company.max_users})`, 400);
     }
 
     // Create invitation token
@@ -135,13 +135,13 @@ const inviteUser = async (req, res) => {
       console.error('Error sending invitation email:', emailError);
       // Delete the user if email fails
       await User.findByIdAndDelete(newUser._id);
-      return errorResponse(res, 'Failed to send invitation email', 500);
+      return errorResponse(res, 'Kunne ikke sende invitations e-mail', 500);
     }
 
-    return successResponse(res, { message: 'Invitation sent successfully' }, 'User invited successfully');
+    return successResponse(res, { message: 'Invitation sendt succesfuldt' }, 'Bruger inviteret succesfuldt');
   } catch (error) {
     console.error('Error inviting user:', error);
-    return errorResponse(res, 'Failed to invite user', 500);
+    return errorResponse(res, 'Kunne ikke invitere bruger', 500);
   }
 };
 
@@ -156,29 +156,29 @@ const updateUserStatus = async (req, res) => {
 
     // Validate action
     if (!['activate', 'deactivate', 'remove'].includes(action)) {
-      return errorResponse(res, 'Invalid action', 400);
+      return errorResponse(res, 'Ugyldig handling', 400);
     }
 
     // Get current user's company
     const currentUser = await User.findById(currentUserId).populate('company_id');
     if (!currentUser || !currentUser.company_id) {
-      return errorResponse(res, 'User not associated with any company', 404);
+      return errorResponse(res, 'Bruger ikke tilknyttet nogen virksomhed', 404);
     }
 
     // Get target user
     const targetUser = await User.findById(userId);
     if (!targetUser) {
-      return errorResponse(res, 'User not found', 404);
+      return errorResponse(res, 'Bruger ikke fundet', 404);
     }
 
     // Check if target user is in the same company
     if (targetUser.company_id.toString() !== currentUser.company_id._id.toString()) {
-      return errorResponse(res, 'Cannot modify user from different company', 403);
+      return errorResponse(res, 'Kan ikke ændre bruger fra anden virksomhed', 403);
     }
 
     // Prevent self-modification
     if (targetUser._id.toString() === currentUserId) {
-      return errorResponse(res, 'Cannot modify your own status', 400);
+      return errorResponse(res, 'Kan ikke ændre din egen status', 400);
     }
 
     let updateData = {};
@@ -196,11 +196,11 @@ const updateUserStatus = async (req, res) => {
 
     await User.findByIdAndUpdate(userId, updateData);
 
-    const actionText = action === 'activate' ? 'activated' : action === 'deactivate' ? 'deactivated' : 'removed';
-    return successResponse(res, { message: `User ${actionText} successfully` }, `User ${actionText} successfully`);
+    const actionText = action === 'activate' ? 'aktiveret' : action === 'deactivate' ? 'deaktiveret' : 'fjernet';
+    return successResponse(res, { message: `Bruger ${actionText} succesfuldt` }, `Bruger ${actionText} succesfuldt`);
   } catch (error) {
     console.error('Error updating user status:', error);
-    return errorResponse(res, 'Failed to update user status', 500);
+    return errorResponse(res, 'Kunne ikke opdatere bruger status', 500);
   }
 };
 

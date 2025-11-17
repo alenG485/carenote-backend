@@ -48,7 +48,7 @@ const register = async (req, res) => {
     // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return errorResponse(res, 'User with this email already exists', 400);
+      return errorResponse(res, 'Bruger med denne e-mail findes allerede', 400);
     }
 
     // Generate email verification token
@@ -75,13 +75,13 @@ const register = async (req, res) => {
     let company = null;
     if (role === 'company_admin') {
       if (!companyName) {
-        return errorResponse(res, 'Company name is required for company admin registration', 400);
+        return errorResponse(res, 'Virksomhedsnavn er påkrævet for virksomhedsadministrator registrering', 400);
       }
 
       // Check if company name already exists
       const existingCompany = await Company.findOne({ name: companyName });
       if (existingCompany) {
-        return errorResponse(res, 'Company with this name already exists', 400);
+        return errorResponse(res, 'Virksomhed med dette navn findes allerede', 400);
       }
 
       // Create company
@@ -155,7 +155,7 @@ const register = async (req, res) => {
         access: accessToken,
         refresh: refreshToken
       },
-      message: 'Registration successful. Please check your email to verify your account.'
+      message: 'Registrering gennemført. Tjek venligst din e-mail for at verificere din konto.'
     };
 
     // Include company info if created
@@ -179,11 +179,11 @@ const register = async (req, res) => {
       billing_interval: subscription.billing_interval
     };
 
-    return successResponse(res, response, 'User registered successfully', 201);
+    return successResponse(res, response, 'Bruger registreret succesfuldt', 201);
 
   } catch (error) {
     console.error('Register error:', error);
-    return errorResponse(res, error.message || 'Failed to register user', 500);
+    return errorResponse(res, error.message || 'Kunne ikke registrere bruger', 500);
   }
 };
 
@@ -203,7 +203,7 @@ const login = async (req, res) => {
     // Find user by email
     const user = await User.findOne({ email }).select('+password');
     if (!user) {
-      return errorResponse(res, 'Invalid email or password', 401);
+      return errorResponse(res, 'Ugyldig e-mail eller adgangskode', 401);
     }
 
     // Check if user has active subscription (activation is now based on subscription)
@@ -212,12 +212,12 @@ const login = async (req, res) => {
     // Verify password
     const isPasswordValid = await user.comparePassword(password);
     if (!isPasswordValid) {
-      return errorResponse(res, 'Invalid email or password', 401);
+      return errorResponse(res, 'Ugyldig e-mail eller adgangskode', 401);
     }
 
     // Check if email is verified
     if (!user.email_verified) {
-      return errorResponse(res, 'Email not verified. Please check your email and verify your account before logging in.', 401);
+      return errorResponse(res, 'E-mail ikke verificeret. Tjek venligst din e-mail og verificer din konto før login.', 401);
     }
 
     // Generate tokens
@@ -234,11 +234,11 @@ const login = async (req, res) => {
         access: accessToken,
         refresh: refreshToken
       }
-    }, 'Login successful');
+    }, 'Login succesfuldt');
 
   } catch (error) {
     console.error('Login error:', error);
-    return errorResponse(res, 'Failed to login', 500);
+    return errorResponse(res, 'Kunne ikke logge ind', 500);
   }
 };
 
@@ -253,14 +253,14 @@ const getProfile = async (req, res) => {
       .select('-password');
 
     if (!user) {
-      return errorResponse(res, 'User not found', 404);
+      return errorResponse(res, 'Bruger ikke fundet', 404);
     }
 
-    return successResponse(res, { user }, 'Profile retrieved successfully');
+    return successResponse(res, { user }, 'Profil hentet succesfuldt');
 
   } catch (error) {
     console.error('Get profile error:', error);
-    return errorResponse(res, 'Failed to get profile', 500);
+    return errorResponse(res, 'Kunne ikke hente profil', 500);
   }
 };
 
@@ -279,7 +279,7 @@ const updateProfile = async (req, res) => {
 
     const user = await User.findById(req.user._id);
     if (!user) {
-      return errorResponse(res, 'User not found', 404);
+      return errorResponse(res, 'Bruger ikke fundet', 404);
     }
 
     // Update fields
@@ -295,11 +295,11 @@ const updateProfile = async (req, res) => {
       .populate('company_id', 'name max_users current_user_count')
       .select('-password');
 
-    return successResponse(res, { user: updatedUser }, 'Profile updated successfully');
+    return successResponse(res, { user: updatedUser }, 'Profil opdateret succesfuldt');
 
   } catch (error) {
     console.error('Update profile error:', error);
-    return errorResponse(res, 'Failed to update profile', 500);
+    return errorResponse(res, 'Kunne ikke opdatere profil', 500);
   }
 };
 
@@ -312,33 +312,33 @@ const changePassword = async (req, res) => {
     const { current_password, new_password } = req.body;
 
     if (!current_password || !new_password) {
-      return errorResponse(res, 'Current password and new password are required', 400);
+      return errorResponse(res, 'Nuværende adgangskode og ny adgangskode er påkrævet', 400);
     }
 
     if (new_password.length < 6) {
-      return errorResponse(res, 'New password must be at least 6 characters long', 400);
+      return errorResponse(res, 'Ny adgangskode skal være mindst 6 tegn', 400);
     }
 
     const user = await User.findById(req.user._id).select('+password');
     if (!user) {
-      return errorResponse(res, 'User not found', 404);
+      return errorResponse(res, 'Bruger ikke fundet', 404);
     }
 
     // Verify current password
     const isCurrentPasswordValid = await user.comparePassword(current_password);
     if (!isCurrentPasswordValid) {
-      return errorResponse(res, 'Current password is incorrect', 400);
+      return errorResponse(res, 'Nuværende adgangskode er forkert', 400);
     }
 
     // Update password
     user.password = new_password;
     await user.save();
 
-    return successResponse(res, null, 'Password changed successfully');
+    return successResponse(res, null, 'Adgangskode ændret succesfuldt');
 
   } catch (error) {
     console.error('Change password error:', error);
-    return errorResponse(res, 'Failed to change password', 500);
+    return errorResponse(res, 'Kunne ikke ændre adgangskode', 500);
   }
 };
 
@@ -351,7 +351,7 @@ const forgotPassword = async (req, res) => {
     const { email } = req.body;
 
     if (!email) {
-      return errorResponse(res, 'Email is required', 400);
+      return errorResponse(res, 'E-mail er påkrævet', 400);
     }
 
     const user = await User.findOne({ email });
@@ -383,14 +383,14 @@ const forgotPassword = async (req, res) => {
       user.reset_password_expires = null;
       await user.save();
       
-      return errorResponse(res, 'Failed to send reset email. Please try again later.', 500);
+      return errorResponse(res, 'Kunne ikke sende nulstil e-mail. Prøv venligst igen senere.', 500);
     }
 
-    return successResponse(res, null, 'If the email exists, a reset link will be sent');
+    return successResponse(res, null, 'Hvis e-mailen findes, vil et nulstillingslink blive sendt');
 
   } catch (error) {
     console.error('Forgot password error:', error);
-    return errorResponse(res, 'Failed to process password reset request', 500);
+    return errorResponse(res, 'Kunne ikke behandle anmodning om nulstilling af adgangskode', 500);
   }
 };
 
@@ -417,7 +417,7 @@ const resetPassword = async (req, res) => {
     });
 
     if (!user) {
-      return errorResponse(res, 'Invalid or expired reset token', 400);
+      return errorResponse(res, 'Ugyldig eller udløbet nulstillings token', 400);
     }
 
     // Update password and clear reset token
@@ -426,11 +426,11 @@ const resetPassword = async (req, res) => {
     user.reset_password_expires = null;
     await user.save();
 
-    return successResponse(res, null, 'Password reset successfully');
+    return successResponse(res, null, 'Adgangskode nulstillet succesfuldt');
 
   } catch (error) {
     console.error('Reset password error:', error);
-    return errorResponse(res, 'Failed to reset password', 500);
+    return errorResponse(res, 'Kunne ikke nulstille adgangskode', 500);
   }
 };
 
@@ -453,7 +453,7 @@ const verifyEmail = async (req, res) => {
     });
 
     if (!user) {
-      return errorResponse(res, 'Invalid or expired verification token', 400);
+      return errorResponse(res, 'Ugyldig eller udløbet verifikations token', 400);
     }
 
     // Verify the email
@@ -461,11 +461,11 @@ const verifyEmail = async (req, res) => {
     user.verification_token = null;
     await user.save();
 
-    return successResponse(res, null, 'Email verified successfully');
+    return successResponse(res, null, 'E-mail verificeret succesfuldt');
 
   } catch (error) {
     console.error('Email verification error:', error);
-    return errorResponse(res, 'Failed to verify email', 500);
+    return errorResponse(res, 'Kunne ikke verificere e-mail', 500);
   }
 };
 
@@ -478,12 +478,12 @@ const resendVerification = async (req, res) => {
     const { email } = req.body;
 
     if (!email) {
-      return errorResponse(res, 'Email is required', 400);
+      return errorResponse(res, 'E-mail er påkrævet', 400);
     }
 
     const user = await User.findOne({ email });
     if (!user) {
-      return errorResponse(res, 'User not found', 404);
+      return errorResponse(res, 'Bruger ikke fundet', 404);
     }
 
     if (user.email_verified) {
@@ -509,14 +509,14 @@ const resendVerification = async (req, res) => {
       });
     } catch (emailError) {
       console.error('Failed to send verification email:', emailError.message);
-      return errorResponse(res, 'Failed to send verification email. Please try again later.', 500);
+      return errorResponse(res, 'Kunne ikke sende verifikations e-mail. Prøv venligst igen senere.', 500);
     }
 
-    return successResponse(res, null, 'Verification email sent successfully');
+    return successResponse(res, null, 'Verifikations e-mail sendt succesfuldt');
 
   } catch (error) {
     console.error('Resend verification error:', error);
-    return errorResponse(res, 'Failed to resend verification email', 500);
+    return errorResponse(res, 'Kunne ikke gensende verifikations e-mail', 500);
   }
 };
 
@@ -529,11 +529,11 @@ const logout = async (req, res) => {
     // For JWT, logout is typically handled client-side by removing the token
     // Could implement token blacklisting here if needed
     
-    return successResponse(res, null, 'Logged out successfully');
+    return successResponse(res, null, 'Logget ud succesfuldt');
 
   } catch (error) {
     console.error('Logout error:', error);
-    return errorResponse(res, 'Failed to logout', 500);
+    return errorResponse(res, 'Kunne ikke logge ud', 500);
   }
 };
 
@@ -552,7 +552,7 @@ const verifyInvitation = async (req, res) => {
     // Find user with this invitation token
     const user = await User.findOne({ invitation_token: token });
     if (!user) {
-      return errorResponse(res, 'Invalid or expired invitation token', 400);
+      return errorResponse(res, 'Ugyldig eller udløbet invitations token', 400);
     }
 
     // Check if invitation is still valid (not expired)
@@ -565,7 +565,7 @@ const verifyInvitation = async (req, res) => {
     // Get company info
     const company = await Company.findById(user.company_id);
     if (!company) {
-      return errorResponse(res, 'Company not found', 404);
+      return errorResponse(res, 'Virksomhed ikke fundet', 404);
     }
 
     const invitationData = {
@@ -579,10 +579,10 @@ const verifyInvitation = async (req, res) => {
       }
     };
 
-    return successResponse(res, invitationData, 'Invitation verified successfully');
+    return successResponse(res, invitationData, 'Invitation verificeret succesfuldt');
   } catch (error) {
     console.error('Verify invitation error:', error);
-    return errorResponse(res, 'Failed to verify invitation', 500);
+    return errorResponse(res, 'Kunne ikke verificere invitation', 500);
   }
 };
 
@@ -605,7 +605,7 @@ const acceptInvitation = async (req, res) => {
     // Find user with this invitation token
     const user = await User.findOne({ invitation_token: token });
     if (!user) {
-      return errorResponse(res, 'Invalid or expired invitation token', 400);
+      return errorResponse(res, 'Ugyldig eller udløbet invitations token', 400);
     }
 
     // Check if invitation is still valid
@@ -625,7 +625,7 @@ const acceptInvitation = async (req, res) => {
     // Get company info
     const company = await Company.findById(user.company_id);
     if (!company) {
-      return errorResponse(res, 'Company not found', 404);
+      return errorResponse(res, 'Virksomhed ikke fundet', 404);
     }
 
     // Generate tokens
@@ -644,7 +644,7 @@ const acceptInvitation = async (req, res) => {
         access: accessToken,
         refresh: refreshToken
       },
-      message: 'Account activated successfully'
+      message: 'Konto aktiveret succesfuldt'
     };
 
     // Include company info
@@ -657,10 +657,10 @@ const acceptInvitation = async (req, res) => {
       };
     }
 
-    return successResponse(res, response, 'Invitation accepted successfully');
+    return successResponse(res, response, 'Invitation accepteret succesfuldt');
   } catch (error) {
     console.error('Accept invitation error:', error);
-    return errorResponse(res, 'Failed to accept invitation', 500);
+    return errorResponse(res, 'Kunne ikke acceptere invitation', 500);
   }
 };
 

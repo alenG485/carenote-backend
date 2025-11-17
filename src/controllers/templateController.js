@@ -33,7 +33,7 @@ const generateTemplate = async (req, res) => {
     });
 
     if (!session) {
-      return errorResponse(res, 'Session not found', 404);
+      return errorResponse(res, 'Session ikke fundet', 404);
     }
 
     // Generate template from Corti
@@ -64,11 +64,11 @@ const generateTemplate = async (req, res) => {
         template_type: type,
         corti_template_key: templateData.templateKey
       }
-    }, 'Template generated successfully', 201);
+    }, 'Skabelon genereret succesfuldt', 201);
 
   } catch (error) {
     console.error('Generate template error:', error);
-    return errorResponse(res, error.message || 'Failed to generate template', 500);
+    return errorResponse(res, error.message || 'Kunne ikke generere skabelon', 500);
   }
 };
 
@@ -87,7 +87,7 @@ const getSessionTemplates = async (req, res) => {
     });
 
     if (!session) {
-      return errorResponse(res, 'Session not found', 404);
+      return errorResponse(res, 'Session ikke fundet', 404);
     }
 
     // Get templates for this session
@@ -96,11 +96,11 @@ const getSessionTemplates = async (req, res) => {
     return successResponse(res, {
       templates: templates,
       session_id: sessionId
-    }, 'Templates retrieved successfully');
+    }, 'Skabeloner hentet succesfuldt');
 
   } catch (error) {
     console.error('Get session templates error:', error);
-    return errorResponse(res, 'Failed to get session templates', 500);
+    return errorResponse(res, 'Kunne ikke hente session skabeloner', 500);
   }
 };
 
@@ -118,11 +118,11 @@ const regenerateTemplate = async (req, res) => {
     }).populate('session_id');
 
     if (!template) {
-      return errorResponse(res, 'Template not found', 404);
+      return errorResponse(res, 'Skabelon ikke fundet', 404);
     }
 
     if (!template.session_id) {
-      return errorResponse(res, 'Template session not found', 404);
+      return errorResponse(res, 'Skabelon session ikke fundet', 404);
     }
 
     // Generate new template from current session facts
@@ -142,11 +142,11 @@ const regenerateTemplate = async (req, res) => {
         facts_used: templateData.facts.length,
         regeneration_count: template.regenerated_count
       }
-    }, 'Template regenerated successfully', 200);
+    }, 'Skabelon regenereret succesfuldt', 200);
 
   } catch (error) {
     console.error('Regenerate template error:', error);
-    return errorResponse(res, error.message || 'Failed to regenerate template', 500);
+    return errorResponse(res, error.message || 'Kunne ikke regenerere skabelon', 500);
   }
 };
 
