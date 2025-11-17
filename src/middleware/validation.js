@@ -193,6 +193,19 @@ const templateValidation = {
   ]
 };
 
+// Lead validation rules
+const leadValidation = {
+  create: [
+    body('email')
+      .isEmail()
+      .normalizeEmail()
+      .withMessage('Indtast venligst en gyldig e-mail'),
+    body('marketingOptIn')
+      .optional()
+      .isBoolean()
+      .withMessage('MarketingOptIn skal være en boolean værdi')
+  ]
+};
 // Subscription validation rules
 const subscriptionValidation = {
   create: [
@@ -332,5 +345,6 @@ module.exports = {
   subscriptionValidation,
   companyValidation,
   paramValidation,
-  queryValidation
+  queryValidation,
+  leadValidation
 }; 
