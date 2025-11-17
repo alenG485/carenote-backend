@@ -11,59 +11,59 @@ const userValidation = {
     body('email')
       .isEmail()
       .normalizeEmail()
-      .withMessage('Please provide a valid email'),
+      .withMessage('Indtast venligst en gyldig e-mail'),
     body('password')
       .isLength({ min: 6 })
-      .withMessage('Password must be at least 6 characters long')
+      .withMessage('Adgangskode skal være mindst 6 tegn')
       .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
-      .withMessage('Password must contain at least one lowercase letter, one uppercase letter, and one number'),
+      .withMessage('Adgangskode skal indeholde mindst ét små bogstav, ét stort bogstav og ét tal'),
     body('name')
       .trim()
       .isLength({ min: 2, max: 100 })
-      .withMessage('Name must be between 2 and 100 characters'),
+      .withMessage('Navn skal være mellem 2 og 100 tegn'),
     body('phone')
       .optional(),
     body('workplace')
       .optional()
       .trim()
       .isLength({ max: 200 })
-      .withMessage('Workplace must be less than 200 characters'),
+      .withMessage('Arbejdssted skal være mindre end 200 tegn'),
     body('journalSystem')
       .optional(),
     body('role')
       .optional()
       .isIn(['user', 'company_admin', 'super_admin'])
-      .withMessage('Invalid role'),
+      .withMessage('Ugyldig rolle'),
     body('companyName')
       .optional()
       .trim()
       .isLength({ min: 2, max: 200 })
-      .withMessage('Company name must be between 2 and 200 characters')
+      .withMessage('Virksomhedsnavn skal være mellem 2 og 200 tegn')
       .custom((value, { req }) => {
         // Company name is required if role is company_admin
         if (req.body.role === 'company_admin' && !value) {
-          throw new Error('Company name is required for company admin registration');
+          throw new Error('Virksomhedsnavn er påkrævet for virksomhedsadministrator registrering');
         }
         return true;
       }),
     body('plan_name')
       .optional()
       .isIn(['individual', 'clinic-small', 'clinic-medium', 'clinic-large'])
-      .withMessage('Plan name must be one of: individual, clinic-small, clinic-medium, clinic-large'),
+      .withMessage('Plan navn skal være en af: individual, clinic-small, clinic-medium, clinic-large'),
     body('trialEndDate')
       .optional()
       .isISO8601()
-      .withMessage('Trial end date must be a valid date')
+      .withMessage('Prøveperiode slutdato skal være en gyldig dato')
   ],
 
   login: [
     body('email')
       .isEmail()
       .normalizeEmail()
-      .withMessage('Please provide a valid email'),
+      .withMessage('Indtast venligst en gyldig e-mail'),
     body('password')
       .notEmpty()
-      .withMessage('Password is required')
+      .withMessage('Adgangskode er påkrævet')
   ],
 
   updateProfile: [
@@ -71,18 +71,18 @@ const userValidation = {
       .optional()
       .trim()
       .isLength({ min: 2, max: 100 })
-      .withMessage('Name must be between 2 and 100 characters'),
+      .withMessage('Navn skal være mellem 2 og 100 tegn'),
     body('specialty')
       .optional(),
     body('phone')
       .optional()
       .isMobilePhone()
-      .withMessage('Please provide a valid phone number'),
+      .withMessage('Indtast venligst et gyldigt telefonnummer'),
     body('workplace')
       .optional()
       .trim()
       .isLength({ max: 200 })
-      .withMessage('Workplace must be less than 200 characters'),
+      .withMessage('Arbejdssted skal være mindre end 200 tegn'),
     body('journalSystem')
       .optional()
   ],
@@ -91,33 +91,33 @@ const userValidation = {
     body('email')
       .isEmail()
       .normalizeEmail()
-      .withMessage('Please provide a valid email')
+      .withMessage('Indtast venligst en gyldig e-mail')
   ],
 
   resetPassword: [
     body('token')
       .notEmpty()
       .isLength({ min: 10 })
-      .withMessage('Valid reset token is required'),
+      .withMessage('Gyldig nulstil token er påkrævet'),
     body('new_password')
       .isLength({ min: 6 })
-      .withMessage('Password must be at least 6 characters long')
+      .withMessage('Adgangskode skal være mindst 6 tegn')
       .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
-      .withMessage('Password must contain at least one lowercase letter, one uppercase letter, and one number')
+      .withMessage('Adgangskode skal indeholde mindst ét små bogstav, ét stort bogstav og ét tal')
   ],
 
   verifyEmail: [
     body('token')
       .notEmpty()
       .isLength({ min: 10 })
-      .withMessage('Valid verification token is required')
+      .withMessage('Gyldig verifikations token er påkrævet')
   ],
 
   resendVerification: [
     body('email')
       .isEmail()
       .normalizeEmail()
-      .withMessage('Please provide a valid email')
+      .withMessage('Indtast venligst en gyldig e-mail')
   ]
 };
 
@@ -128,34 +128,34 @@ const sessionValidation = {
       .optional()
       .trim()
       .isLength({ min: 1, max: 200 })
-      .withMessage('Session title must be between 1 and 200 characters'),
+      .withMessage('Session titel skal være mellem 1 og 200 tegn'),
     body('specialty')
       .optional()
       .isString()
-      .withMessage('Specialty must be a string'),
+      .withMessage('Specialitet skal være en streng'),
     body('encounter_type')
       .optional()
       .isIn(['consultation', 'follow_up', 'emergency', 'routine'])
-      .withMessage('Invalid encounter type'),
+      .withMessage('Ugyldig mødestedstype'),
     body('patient_data')
       .optional()
       .isObject()
-      .withMessage('Patient data must be an object')
+      .withMessage('Patient data skal være et objekt')
   ],
 
   addFact: [
     body('text')
       .trim()
       .isLength({ min: 1, max: 1000 })
-      .withMessage('Fact text must be between 1 and 1000 characters'),
+      .withMessage('Fakta tekst skal være mellem 1 og 1000 tegn'),
     body('group')
       .trim()
       .isLength({ min: 1, max: 100 })
-      .withMessage('Fact group is required and must be less than 100 characters'),
+      .withMessage('Fakta gruppe er påkrævet og skal være mindre end 100 tegn'),
     body('confidence')
       .optional()
       .isFloat({ min: 0, max: 1 })
-      .withMessage('Confidence must be between 0 and 1')
+      .withMessage('Sikkerhed skal være mellem 0 og 1')
   ],
 
   updateFact: [
@@ -163,20 +163,20 @@ const sessionValidation = {
       .optional()
       .trim()
       .isLength({ min: 1, max: 1000 })
-      .withMessage('Fact text must be between 1 and 1000 characters'),
+      .withMessage('Fakta tekst skal være mellem 1 og 1000 tegn'),
     body('group')
       .optional()
       .trim()
       .isLength({ min: 1, max: 100 })
-      .withMessage('Fact group must be less than 100 characters'),
+      .withMessage('Fakta gruppe skal være mindre end 100 tegn'),
     body('confidence')
       .optional()
       .isFloat({ min: 0, max: 1 })
-      .withMessage('Confidence must be between 0 and 1'),
+      .withMessage('Sikkerhed skal være mellem 0 og 1'),
     body('is_discarded')
       .optional()
       .isBoolean()
-      .withMessage('is_discarded must be a boolean')
+      .withMessage('is_discarded skal være en boolean værdi')
   ]
 };
 
@@ -185,11 +185,11 @@ const templateValidation = {
   generate: [
     body('session_id')
       .isMongoId()
-      .withMessage('Valid session ID is required'),
+      .withMessage('Gyldig session ID er påkrævet'),
     body('type')
       .optional()
       .isIn(['soap', 'brief-clinical-note'])
-      .withMessage('Invalid template type')
+      .withMessage('Ugyldig skabelonstype')
   ]
 };
 
@@ -212,42 +212,42 @@ const subscriptionValidation = {
     body('plan_name')
       .optional()
       .isIn(['individual', 'clinic-small', 'clinic-medium', 'clinic-large'])
-      .withMessage('Plan name must be one of: individual, clinic-small, clinic-medium, clinic-large'),
+      .withMessage('Plan navn skal være en af: individual, clinic-small, clinic-medium, clinic-large'),
     body('billing_amount')
       .optional()
       .isFloat({ min: 0 })
-      .withMessage('Billing amount must be a positive number'),
+      .withMessage('Faktureringsbeløb skal være et positivt tal'),
     body('billing_interval')
       .optional()
       .isIn(['monthly', 'yearly'])
-      .withMessage('Billing interval must be monthly or yearly'),
+      .withMessage('Faktureringsinterval skal være månedlig eller årlig'),
     body('trial_days')
       .optional()
       .isInt({ min: 1, max: 365 })
-      .withMessage('Trial days must be between 1 and 365')
+      .withMessage('Prøveperiodedage skal være mellem 1 og 365')
   ],
 
   update: [
     body('plan_name')
       .optional()
       .isIn(['individual', 'clinic-small', 'clinic-medium', 'clinic-large'])
-      .withMessage('Plan name must be one of: individual, clinic-small, clinic-medium, clinic-large'),
+      .withMessage('Plan navn skal være en af: individual, clinic-small, clinic-medium, clinic-large'),
     body('billing_amount')
       .optional()
       .isFloat({ min: 0 })
-      .withMessage('Billing amount must be a positive number'),
+      .withMessage('Faktureringsbeløb skal være et positivt tal'),
     body('billing_interval')
       .optional()
       .isIn(['monthly', 'yearly'])
-      .withMessage('Billing interval must be monthly or yearly'),
+      .withMessage('Faktureringsinterval skal være månedlig eller årlig'),
     body('status')
       .optional()
       .isIn(['active', 'inactive', 'expired', 'cancelled'])
-      .withMessage('Status must be one of: active, inactive, expired, cancelled'),
+      .withMessage('Status skal være en af: active, inactive, expired, cancelled'),
     body('notes')
       .optional()
       .isString()
-      .withMessage('Notes must be a string')
+      .withMessage('Noter skal være en streng')
   ]
 };
 
@@ -257,16 +257,16 @@ const companyValidation = {
     body('name')
       .trim()
       .isLength({ min: 2, max: 200 })
-      .withMessage('Company name must be between 2 and 200 characters'),
+      .withMessage('Virksomhedsnavn skal være mellem 2 og 200 tegn'),
     body('description')
       .optional()
       .trim()
       .isLength({ max: 500 })
-      .withMessage('Description must be less than 500 characters'),
+      .withMessage('Beskrivelse skal være mindre end 500 tegn'),
     body('max_users')
       .optional()
       .isInt({ min: 1, max: 500 })
-      .withMessage('Max users must be between 1 and 500')
+      .withMessage('Maksimum antal brugere skal være mellem 1 og 500')
   ],
 
   update: [
@@ -274,27 +274,27 @@ const companyValidation = {
       .optional()
       .trim()
       .isLength({ min: 2, max: 200 })
-      .withMessage('Company name must be between 2 and 200 characters'),
+      .withMessage('Virksomhedsnavn skal være mellem 2 og 200 tegn'),
     body('description')
       .optional()
       .trim()
       .isLength({ max: 500 })
-      .withMessage('Description must be less than 500 characters'),
+      .withMessage('Beskrivelse skal være mindre end 500 tegn'),
     body('max_users')
       .optional()
       .isInt({ min: 1, max: 500 })
-      .withMessage('Max users must be between 1 and 500')
+      .withMessage('Maksimum antal brugere skal være mellem 1 og 500')
   ],
 
   inviteUser: [
     body('email')
       .isEmail()
       .normalizeEmail()
-      .withMessage('Please provide a valid email'),
+      .withMessage('Indtast venligst en gyldig e-mail'),
     body('name')
       .trim()
       .isLength({ min: 2, max: 100 })
-      .withMessage('Name must be between 2 and 100 characters'),
+      .withMessage('Navn skal være mellem 2 og 100 tegn'),
     body('specialty')
       .optional()
       .isIn([
@@ -303,7 +303,7 @@ const companyValidation = {
         'pulmonology', 'rheumatology', 'psychiatry', 'orthopedics', 'ophthalmology',
         'otolaryngology', 'urology', 'gynecology', 'pediatrics', 'geriatrics'
       ])
-      .withMessage('Invalid specialty')
+      .withMessage('Ugyldig specialitet')
   ]
 };
 
@@ -312,7 +312,7 @@ const paramValidation = {
   mongoId: (paramName) => [
     param(paramName)
       .isMongoId()
-      .withMessage(`Valid ${paramName} is required`)
+      .withMessage(`Gyldig ${paramName} er påkrævet`)
   ]
 };
 
@@ -322,11 +322,11 @@ const queryValidation = {
     query('page')
       .optional()
       .isInt({ min: 1 })
-      .withMessage('Page must be a positive integer'),
+      .withMessage('Side skal være et positivt heltal'),
     query('limit')
       .optional()
       .isInt({ min: 1, max: 100 })
-      .withMessage('Limit must be between 1 and 100')
+      .withMessage('Limit skal være mellem 1 og 100')
   ],
 
   search: [
@@ -334,7 +334,7 @@ const queryValidation = {
       .optional()
       .trim()
       .isLength({ min: 1, max: 100 })
-      .withMessage('Search query must be between 1 and 100 characters')
+      .withMessage('Søgequery skal være mellem 1 og 100 tegn')
   ]
 };
 

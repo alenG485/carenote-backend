@@ -415,7 +415,7 @@ const generateInvoiceHTML = (invoiceData) => {
           <div class="company-info">
             <p>CareNote ApS</p>
             <p>Healthcare Documentation Platform</p>
-            <p>Email: billing@carenote.dk</p>
+            <p>Email: kontakt@carenote.dk</p>
           </div>
           <p class="invoice-number">Invoice #: ${invoiceData.invoice_number}</p>
         </div>
@@ -463,7 +463,7 @@ const generateInvoiceHTML = (invoiceData) => {
         
         <div class="footer">
           <p>Thank you for choosing CareNote!</p>
-          <p>For questions about this invoice, please contact us at billing@carenote.dk</p>
+          <p>For questions about this invoice, please contact us at kontakt@carenote.dk</p>
           <p><small>This invoice is generated automatically. Please include the invoice number as reference when making payment.</small></p>
         </div>
       </div>

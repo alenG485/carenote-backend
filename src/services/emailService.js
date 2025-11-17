@@ -103,7 +103,7 @@ class EmailService {
               </ul>
             </div>
             
-            <p>Hvis du har spørgsmål eller brug for hjælp, så tøv ikke med at kontakte vores support på <a href="mailto:support@carenote.dk">support@carenote.dk</a>.</p>
+            <p>Hvis du har spørgsmål eller brug for hjælp, så tøv ikke med at kontakte os på <a href="mailto:kontakt@carenote.dk">kontakt@carenote.dk</a>.</p>
             
             <p>Med venlig hilsen,<br>
             ${this.companyName} teamet</p>
@@ -136,7 +136,7 @@ class EmailService {
       - Tidsbesparelse på op til 90% ved dokumentation
       - Sikker håndtering af patientdata
       
-      Hvis du har spørgsmål eller brug for hjælp, så kontakt os på support@carenote.dk.
+      Hvis du har spørgsmål eller brug for hjælp, så kontakt os på kontakt@carenote.dk.
       
       Med venlig hilsen,
       ${this.companyName} teamet
@@ -213,7 +213,7 @@ class EmailService {
             
             <p>Hvis du ikke anmodede om at nulstille din adgangskode, kan du ignorere denne e-mail. Din konto forbliver sikker.</p>
             
-            <p>Hvis du har spørgsmål, kan du kontakte os på <a href="mailto:support@carenote.dk">support@carenote.dk</a>.</p>
+            <p>Hvis du har spørgsmål, kan du kontakte os på <a href="mailto:kontakt@carenote.dk">kontakt@carenote.dk</a>.</p>
             
             <p>Med venlig hilsen,<br>
             ${this.companyName} teamet</p>
@@ -248,7 +248,7 @@ class EmailService {
       
       Hvis du ikke anmodede om at nulstille din adgangskode, kan du ignorere denne e-mail. Din konto forbliver sikker.
       
-      Spørgsmål? Kontakt os på support@carenote.dk
+      Spørgsmål? Kontakt os på kontakt@carenote.dk
       
       Med venlig hilsen,
       ${this.companyName} teamet
@@ -494,7 +494,7 @@ class EmailService {
               </ul>
             </div>
             
-            <p>Hvis du har spørgsmål eller brug for hjælp, så tøv ikke med at kontakte vores support på <a href="mailto:support@carenote.dk">support@carenote.dk</a>.</p>
+            <p>Hvis du har spørgsmål eller brug for hjælp, så tøv ikke med at kontakte os på <a href="mailto:kontakt@carenote.dk">kontakt@carenote.dk</a>.</p>
             
             <p>Med venlig hilsen,<br>
             ${this.companyName} teamet</p>
@@ -532,7 +532,7 @@ class EmailService {
       - Sikker håndtering af patientdata
       - Samarbejde med dit team
       
-      Hvis du har spørgsmål eller brug for hjælp, så kontakt os på support@carenote.dk.
+      Hvis du har spørgsmål eller brug for hjælp, så kontakt os på kontakt@carenote.dk.
       
       Med venlig hilsen,
       ${this.companyName} teamet
