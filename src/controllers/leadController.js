@@ -8,6 +8,7 @@ const { successResponse, errorResponse } = require('../utils/responses');
  * Handles capture of marketing opt-in emails prior to full registration
  */
 
+
 /**
  * @route   POST /api/leads
  * @desc    Create or update a lead capture entry
