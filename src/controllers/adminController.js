@@ -44,6 +44,7 @@ const getAllUsers = async (req, res) => {
       company_name: user.is_company_admin ? user.workplace : null,
       specialty: user.specialty,
       workplace: user.workplace,
+      phone: user.phone || null,
       subscription: user.subscription_id ? {
         id: user.subscription_id._id,
         numLicenses: user.subscription_id.numLicenses,
@@ -641,6 +642,7 @@ const getUserDetails = async (req, res) => {
       company_name: user.is_company_admin ? user.workplace : null,
       specialty: user.specialty,
       workplace: user.workplace,
+      phone: user.phone || null,
       subscription: user.subscription_id ? {
         id: user.subscription_id._id,
         numLicenses: user.subscription_id.numLicenses,
