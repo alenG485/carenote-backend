@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const templateController = require('../controllers/templateController');
-const { authenticate, requireActiveSubscription } = require('../middleware/auth');
+const { authenticate, requireActiveSubscription, requireSessionAccess } = require('../middleware/auth');
 const { templateValidation, paramValidation } = require('../middleware/validation');
 
 /**
@@ -24,11 +24,12 @@ router.post('/generate',
 /**
  * @route   GET /api/templates/session/:sessionId
  * @desc    Get templates for a session
- * @access  Private
+ * @access  Private (with session access control)
  */
 router.get('/session/:sessionId', 
   authenticate,
   paramValidation.mongoId('sessionId'),
+  requireSessionAccess('sessionId'),
   templateController.getSessionTemplates
 );
 

@@ -146,12 +146,66 @@ const requireActiveSubscription = async (req, res, next) => {
   }
 };
 
+/**
+ * Check if user can access a specific session
+ * - Super admin can access any session
+ * - User can access their own sessions (session.user_id === req.user._id)
+ * - Company admin can access sessions from users they invited (session owner's invited_by === req.user._id)
+ * - Invited users can only access their own sessions
+ */
+const requireSessionAccess = (sessionIdParam = 'sessionId') => {
+  return async (req, res, next) => {
+    try {
+      const Session = require('../models/Session');
+      const User = require('../models/User');
+      const sessionId = req.params[sessionIdParam];
 
+      // Find the session
+      const session = await Session.findById(sessionId);
+      if (!session) {
+        return errorResponse(res, 'Session ikke fundet', 404);
+      }
+
+      // Super admin can access any session
+      if (req.user.role === 'super_admin') {
+        req.session = session;
+        return next();
+      }
+
+      // Check if user owns the session (session.user_id === req.user._id)
+      if (session.user_id.toString() === req.user._id.toString()) {
+        req.session = session;
+        return next();
+      }
+
+      // If user is company admin, check if session belongs to a user they invited
+      // This allows company admins to access sessions from users they invited
+      if (req.user.is_company_admin) {
+        const sessionOwner = await User.findById(session.user_id).select('_id invited_by');
+        
+        if (sessionOwner && sessionOwner.invited_by) {
+          // Check if the session owner was invited by the current user (company admin)
+          if (sessionOwner.invited_by.toString() === req.user._id.toString()) {
+            req.session = session;
+            return next();
+          }
+        }
+      }
+
+      // Access denied - user doesn't own the session and is not the admin of the session owner
+      return errorResponse(res, 'Adgang nægtet til denne session', 403);
+    } catch (error) {
+      console.error('Session access check error:', error);
+      return errorResponse(res, 'Kunne ikke verificere session adgang', 500);
+    }
+  };
+};
 
 module.exports = {
   authenticate,
   requireSuperAdmin,
   requireCompanyAdmin,
   requireCompanyAccess,
-  requireActiveSubscription
+  requireActiveSubscription,
+  requireSessionAccess
 }; 

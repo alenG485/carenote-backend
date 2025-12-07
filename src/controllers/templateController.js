@@ -26,14 +26,29 @@ const generateTemplate = async (req, res) => {
       outputLanguage
     } = req.body;
 
-    // Get session
-    const session = await Session.findOne({
-      _id: session_id,
-      user_id: req.user._id
-    });
-
+    // Verify session access (user owns session OR is company admin of session owner)
+    const User = require('../models/User');
+    const session = await Session.findById(session_id);
+    
     if (!session) {
       return errorResponse(res, 'Session ikke fundet', 404);
+    }
+
+    // Check access: user owns session OR is company admin and session owner was invited by them
+    let hasAccess = false;
+    
+    if (session.user_id.toString() === req.user._id.toString()) {
+      hasAccess = true;
+    } else if (req.user.is_company_admin) {
+      const sessionOwner = await User.findById(session.user_id).select('_id invited_by');
+      if (sessionOwner && sessionOwner.invited_by && 
+          sessionOwner.invited_by.toString() === req.user._id.toString()) {
+        hasAccess = true;
+      }
+    }
+
+    if (!hasAccess && req.user.role !== 'super_admin') {
+      return errorResponse(res, 'Adgang nægtet til denne session', 403);
     }
 
     // Generate template from Corti
@@ -46,9 +61,10 @@ const generateTemplate = async (req, res) => {
     const templateTitle = type === 'soap' ? 'SOAP Note' : 'Brief Clinical Note';
 
     // Create or update template in database
+    // Use session owner's user_id (not req.user._id) so templates are associated with session owner
     const template = await Template.getOrCreateTemplate(
       session._id,
-      req.user._id,
+      session.user_id, // Use session owner's user_id
       type,
       templateData.templateKey,
       templateTitle,
@@ -75,27 +91,20 @@ const generateTemplate = async (req, res) => {
 /**
  * Get templates for a session
  * GET /api/templates/session/:sessionId
+ * Access control handled by requireSessionAccess middleware
  */
 const getSessionTemplates = async (req, res) => {
   try {
-    const { sessionId } = req.params;
+    // Session is already loaded and access verified by requireSessionAccess middleware
+    const session = req.session;
 
-    // Verify session belongs to user
-    const session = await Session.findOne({
-      _id: sessionId,
-      user_id: req.user._id
-    });
-
-    if (!session) {
-      return errorResponse(res, 'Session ikke fundet', 404);
-    }
-
-    // Get templates for this session
-    const templates = await Template.getTemplatesForSession(sessionId, req.user._id);
+    // Get templates for this session - use session owner's user_id
+    // This allows company admins to see templates from sessions they have access to
+    const templates = await Template.getTemplatesForSession(session._id, session.user_id);
 
     return successResponse(res, {
       templates: templates,
-      session_id: sessionId
+      session_id: session._id
     }, 'Skabeloner hentet succesfuldt');
 
   } catch (error) {
@@ -111,11 +120,9 @@ const getSessionTemplates = async (req, res) => {
 const regenerateTemplate = async (req, res) => {
   try {
     const { id } = req.params;
+    const User = require('../models/User');
 
-    const template = await Template.findOne({
-      _id: id,
-      user_id: req.user._id
-    }).populate('session_id');
+    const template = await Template.findById(id).populate('session_id');
 
     if (!template) {
       return errorResponse(res, 'Skabelon ikke fundet', 404);
@@ -123,6 +130,23 @@ const regenerateTemplate = async (req, res) => {
 
     if (!template.session_id) {
       return errorResponse(res, 'Skabelon session ikke fundet', 404);
+    }
+
+    // Check access: user owns template OR is company admin and session owner was invited by them
+    let hasAccess = false;
+    
+    if (template.user_id.toString() === req.user._id.toString()) {
+      hasAccess = true;
+    } else if (req.user.is_company_admin) {
+      const sessionOwner = await User.findById(template.session_id.user_id).select('_id invited_by');
+      if (sessionOwner && sessionOwner.invited_by && 
+          sessionOwner.invited_by.toString() === req.user._id.toString()) {
+        hasAccess = true;
+      }
+    }
+
+    if (!hasAccess && req.user.role !== 'super_admin') {
+      return errorResponse(res, 'Adgang nægtet til denne skabelon', 403);
     }
 
     // Generate new template from current session facts

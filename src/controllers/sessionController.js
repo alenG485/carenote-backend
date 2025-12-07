@@ -64,19 +64,15 @@ const startSession = async (req, res) => {
 /**
  * Get session
  * GET /api/sessions/:sessionId
+ * Access control handled by requireSessionAccess middleware
  */
 const getSession = async (req, res) => {
   try {
-    const { sessionId } = req.params;
+    // Session is already loaded and access verified by requireSessionAccess middleware
+    const session = req.session;
 
-    const session = await Session.findOne({
-      _id: sessionId,
-      user_id: req.user._id,
-      deleted: false
-    });
-
-    if (!session) {
-      return errorResponse(res, 'Aktiv session ikke fundet', 404);
+    if (session.deleted) {
+      return errorResponse(res, 'Session er slettet', 404);
     }
 
     return successResponse(res, {
@@ -84,27 +80,23 @@ const getSession = async (req, res) => {
     }, 'Session hentet succesfuldt');
 
   } catch (error) {
-    console.error('Get WebSocket URL error:', error);
-    return errorResponse(res, 'Kunne ikke hente WebSocket URL', 500);
+    console.error('Get session error:', error);
+    return errorResponse(res, 'Kunne ikke hente session', 500);
   }
 };
 
 /**
  * Get session facts from Corti API
  * GET /api/sessions/:sessionId/facts
+ * Access control handled by requireSessionAccess middleware
  */
 const getSessionFacts = async (req, res) => {
   try {
-    const { sessionId } = req.params;
+    // Session is already loaded and access verified by requireSessionAccess middleware
+    const session = req.session;
 
-    const session = await Session.findOne({
-      _id: sessionId,
-      user_id: req.user._id,
-      deleted: false
-    });
-
-    if (!session) {
-      return errorResponse(res, 'Session ikke fundet', 404);
+    if (session.deleted) {
+      return errorResponse(res, 'Session er slettet', 404);
     }
 
     // Fetch facts directly from Corti API
@@ -112,7 +104,7 @@ const getSessionFacts = async (req, res) => {
 
     return successResponse(res, {
       facts: facts,
-      session_id: sessionId,
+      session_id: session._id,
       interaction_id: session.corti_interaction_id
     }, 'Fakta hentet succesfuldt');
 
@@ -125,24 +117,21 @@ const getSessionFacts = async (req, res) => {
 /**
  * Add fact to session via Corti API
  * POST /api/sessions/:sessionId/facts
+ * Access control handled by requireSessionAccess middleware
  */
 const addFact = async (req, res) => {
   try {
-    const { sessionId } = req.params;
     const { text, group, source = 'user' } = req.body;
 
     if (!text || !group) {
       return errorResponse(res, 'Text and group are required', 400);
     }
 
-    const session = await Session.findOne({
-      _id: sessionId,
-      user_id: req.user._id,
-      deleted: false
-    });
+    // Session is already loaded and access verified by requireSessionAccess middleware
+    const session = req.session;
 
-    if (!session) {
-      return errorResponse(res, 'Session ikke fundet', 404);
+    if (session.deleted) {
+      return errorResponse(res, 'Session er slettet', 404);
     }
 
     // Add fact via Corti API
@@ -154,7 +143,7 @@ const addFact = async (req, res) => {
 
     return successResponse(res, {
       fact: result,
-      session_id: sessionId
+      session_id: session._id
     }, 'Fakta tilføjet succesfuldt');
 
   } catch (error) {
@@ -166,20 +155,18 @@ const addFact = async (req, res) => {
 /**
  * Update fact via Corti API
  * PUT /api/sessions/:sessionId/facts/:factId
+ * Access control handled by requireSessionAccess middleware
  */
 const updateFact = async (req, res) => {
   try {
-    const { sessionId, factId } = req.params;
+    const { factId } = req.params;
     const { text, group, isDiscarded } = req.body;
 
-    const session = await Session.findOne({
-      _id: sessionId,
-      user_id: req.user._id,
-      deleted: false
-    });
+    // Session is already loaded and access verified by requireSessionAccess middleware
+    const session = req.session;
 
-    if (!session) {
-      return errorResponse(res, 'Session ikke fundet', 404);
+    if (session.deleted) {
+      return errorResponse(res, 'Session er slettet', 404);
     }
 
     // Update fact via Corti API
@@ -191,7 +178,7 @@ const updateFact = async (req, res) => {
 
     return successResponse(res, {
       fact: result,
-      session_id: sessionId
+      session_id: session._id
     }, 'Fakta opdateret succesfuldt');
 
   } catch (error) {
@@ -203,19 +190,19 @@ const updateFact = async (req, res) => {
 /**
  * Start session recording
  * POST /api/sessions/:sessionId/start-recording
+ * Access control handled by requireSessionAccess middleware
  */
 const startSessionRecording = async (req, res) => {
   try {
-    const { sessionId } = req.params;
+    // Session is already loaded and access verified by requireSessionAccess middleware
+    const session = req.session;
 
-    const session = await Session.findOne({
-      _id: sessionId,
-      user_id: req.user._id,
-      status: 'active'
-    });
+    if (session.deleted) {
+      return errorResponse(res, 'Session er slettet', 404);
+    }
 
-    if (!session) {
-      return errorResponse(res, 'Aktiv session ikke fundet', 404);
+    if (session.status !== 'active') {
+      return errorResponse(res, 'Session er ikke aktiv', 400);
     }
 
     // Update session status to started
@@ -235,18 +222,15 @@ const startSessionRecording = async (req, res) => {
 /**
  * End recording session
  * POST /api/sessions/:sessionId/end
+ * Access control handled by requireSessionAccess middleware
  */
 const endSession = async (req, res) => {
   try {
-    const { sessionId } = req.params;
+    // Session is already loaded and access verified by requireSessionAccess middleware
+    const session = req.session;
 
-    const session = await Session.findOne({
-      _id: sessionId,
-      user_id: req.user._id
-    });
-
-    if (!session) {
-      return errorResponse(res, 'Aktiv session ikke fundet', 404);
+    if (session.deleted) {
+      return errorResponse(res, 'Session er slettet', 404);
     }
 
     // End the session
@@ -280,19 +264,24 @@ const getUserSessions = async (req, res) => {
       if (user_id) {
         query.user_id = user_id;
       }
-    } else if (req.user.role === 'company_admin') {
-      // Company admin can see sessions from users in their company
+    } else if (req.user.is_company_admin) {
+      // Company admin can see sessions from users they invited (plus their own)
       if (user_id) {
-        // Verify the user belongs to the company admin's company
+        // Verify the user is either the company admin or was invited by them
         const targetUser = await User.findById(user_id);
-        if (!targetUser || targetUser.company_id?.toString() !== req.user.company_id?.toString()) {
+        if (!targetUser) {
+          return errorResponse(res, 'Bruger ikke fundet', 404);
+        }
+        // Check if target user is the company admin or was invited by them
+        if (targetUser._id.toString() !== req.user._id.toString() && 
+            (!targetUser.invited_by || targetUser.invited_by.toString() !== req.user._id.toString())) {
           return errorResponse(res, 'Adgang nægtet til denne brugers sessions', 403);
         }
         query.user_id = user_id;
       } else {
-        // Get all users in the company
-        const companyUsers = await User.find({ company_id: req.user.company_id }).select('_id');
-        const userIds = companyUsers.map(user => user._id);
+        // Get all users in the company (main user + invited users)
+        const invitedUsers = await User.find({ invited_by: req.user._id }).select('_id');
+        const userIds = [req.user._id, ...invitedUsers.map(user => user._id)];
         query.user_id = { $in: userIds };
       }
     } else {
@@ -357,19 +346,15 @@ const getCompanySessions = async (req, res) => {
     const { limit = 50, days = 7 } = req.query;
 
     // Only company admins and super admins can access this
-    if (req.user.role !== 'company_admin' && req.user.role !== 'super_admin') {
+    if (!req.user.is_company_admin && req.user.role !== 'super_admin') {
       return errorResponse(res, 'Virksomhedsadministrator adgang påkrævet', 403);
     }
 
-    let companyId = req.user.company_id;
+    let mainUserId = req.user._id;
     
-    // Super admin can specify company_id
-    if (req.user.role === 'super_admin' && req.query.company_id) {
-      companyId = req.query.company_id;
-    }
-
-    if (!companyId) {
-      return errorResponse(res, 'Virksomheds ID påkrævet', 400);
+    // Super admin can specify user_id to see sessions for a specific company admin
+    if (req.user.role === 'super_admin' && req.query.user_id) {
+      mainUserId = req.query.user_id;
     }
 
     // Calculate date filter
@@ -377,11 +362,21 @@ const getCompanySessions = async (req, res) => {
     daysAgo.setDate(daysAgo.getDate() - parseInt(days));
     daysAgo.setHours(0, 0, 0, 0);
 
-    // Get all users in the company
-    const companyUsers = await User.find({ company_id: companyId })
+    // Get main user
+    const mainUser = await User.findById(mainUserId)
+      .select('_id name email specialty role')
+      .lean();
+    
+    if (!mainUser) {
+      return errorResponse(res, 'Bruger ikke fundet', 404);
+    }
+
+    // Get all users invited by this main user (including the main user)
+    const invitedUsers = await User.find({ invited_by: mainUserId })
       .select('_id name email specialty role')
       .lean();
 
+    const companyUsers = [mainUser, ...invitedUsers];
     const userIds = companyUsers.map(user => user._id);
 
     // Get sessions for all company users
@@ -458,19 +453,24 @@ const getRecentSessions = async (req, res) => {
       if (user_id) {
         query.user_id = user_id;
       }
-    } else if (req.user.role === 'company_admin') {
-      // Company admin can see sessions from users in their company
+    } else if (req.user.is_company_admin) {
+      // Company admin can see sessions from users they invited (plus their own)
       if (user_id) {
-        // Verify the user belongs to the company admin's company
+        // Verify the user is either the company admin or was invited by them
         const targetUser = await User.findById(user_id);
-        if (!targetUser || targetUser.company_id?.toString() !== req.user.company_id?.toString()) {
+        if (!targetUser) {
+          return errorResponse(res, 'Bruger ikke fundet', 404);
+        }
+        // Check if target user is the company admin or was invited by them
+        if (targetUser._id.toString() !== req.user._id.toString() && 
+            (!targetUser.invited_by || targetUser.invited_by.toString() !== req.user._id.toString())) {
           return errorResponse(res, 'Adgang nægtet til denne brugers sessions', 403);
         }
         query.user_id = user_id;
       } else {
-        // Get all users in the company
-        const companyUsers = await User.find({ company_id: req.user.company_id }).select('_id');
-        const userIds = companyUsers.map(user => user._id);
+        // Get all users in the company (main user + invited users)
+        const invitedUsers = await User.find({ invited_by: req.user._id }).select('_id');
+        const userIds = [req.user._id, ...invitedUsers.map(user => user._id)];
         query.user_id = { $in: userIds };
       }
     } else {
@@ -506,19 +506,15 @@ const getRecentSessions = async (req, res) => {
 /**
  * Soft delete a session
  * DELETE /api/sessions/:sessionId
+ * Access control handled by requireSessionAccess middleware
  */
 const deleteSession = async (req, res) => {
   try {
-    const { sessionId } = req.params;
+    // Session is already loaded and access verified by requireSessionAccess middleware
+    const session = req.session;
 
-    const session = await Session.findOne({
-      _id: sessionId,
-      user_id: req.user._id,
-      deleted: false
-    });
-
-    if (!session) {
-      return errorResponse(res, 'Session ikke fundet', 404);
+    if (session.deleted) {
+      return errorResponse(res, 'Session er allerede slettet', 404);
     }
 
     // Soft delete the session
@@ -526,7 +522,7 @@ const deleteSession = async (req, res) => {
     await session.save();
 
     return successResponse(res, {
-      session_id: sessionId
+      session_id: session._id
     }, 'Session slettet succesfuldt');
 
   } catch (error) {

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const sessionController = require('../controllers/sessionController');
-const { authenticate, requireActiveSubscription, requireCompanyAdmin } = require('../middleware/auth');
+const { authenticate, requireActiveSubscription, requireCompanyAdmin, requireSessionAccess } = require('../middleware/auth');
 const { sessionValidation, paramValidation, queryValidation } = require('../middleware/validation');
 
 /**
@@ -66,33 +66,36 @@ router.get('/',
 /**
  * @route   GET /api/sessions/:sessionId
  * @desc    Get session
- * @access  Private
+ * @access  Private (with session access control)
  */
 router.get('/:sessionId', 
   authenticate,
   paramValidation.mongoId('sessionId'),
+  requireSessionAccess('sessionId'),
   sessionController.getSession
 );
 
 /**
  * @route   GET /api/sessions/:sessionId/facts
  * @desc    Get session facts
- * @access  Private
+ * @access  Private (with session access control)
  */
 router.get('/:sessionId/facts', 
   authenticate,
   paramValidation.mongoId('sessionId'),
+  requireSessionAccess('sessionId'),
   sessionController.getSessionFacts
 );
 
 /**
  * @route   POST /api/sessions/:sessionId/facts
  * @desc    Add fact to session
- * @access  Private
+ * @access  Private (with session access control)
  */
 router.post('/:sessionId/facts', 
   authenticate,
   paramValidation.mongoId('sessionId'),
+  requireSessionAccess('sessionId'),
   sessionValidation.addFact,
   sessionController.addFact
 );
@@ -100,12 +103,13 @@ router.post('/:sessionId/facts',
 /**
  * @route   PUT /api/sessions/:sessionId/facts/:factId
  * @desc    Update fact in session
- * @access  Private
+ * @access  Private (with session access control)
  */
 router.put('/:sessionId/facts/:factId', 
   authenticate,
   paramValidation.mongoId('sessionId'),
   paramValidation.mongoId('factId'),
+  requireSessionAccess('sessionId'),
   sessionValidation.updateFact,
   sessionController.updateFact
 );
@@ -113,33 +117,36 @@ router.put('/:sessionId/facts/:factId',
 /**
  * @route   POST /api/sessions/:sessionId/start-recording
  * @desc    Start session recording
- * @access  Private
+ * @access  Private (with session access control)
  */
 router.post('/:sessionId/start-recording', 
   authenticate,
   paramValidation.mongoId('sessionId'),
+  requireSessionAccess('sessionId'),
   sessionController.startSessionRecording
 );
 
 /**
  * @route   POST /api/sessions/:sessionId/end
  * @desc    End recording session
- * @access  Private
+ * @access  Private (with session access control)
  */
 router.post('/:sessionId/end', 
   authenticate,
   paramValidation.mongoId('sessionId'),
+  requireSessionAccess('sessionId'),
   sessionController.endSession
 );
 
 /**
  * @route   DELETE /api/sessions/:sessionId
  * @desc    Soft delete session
- * @access  Private
+ * @access  Private (with session access control)
  */
 router.delete('/:sessionId', 
   authenticate,
   paramValidation.mongoId('sessionId'),
+  requireSessionAccess('sessionId'),
   sessionController.deleteSession
 );
 
