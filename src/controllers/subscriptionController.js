@@ -358,13 +358,8 @@ const upgradeLicenses = async (req, res) => {
 
     await subscription.save();
 
-    // Update company max_users if user has a company
-    const user = await User.findById(subscription.user_id).populate('company_id');
-    if (user && user.company_id) {
-      await Company.findByIdAndUpdate(user.company_id._id, {
-        max_users: numLicenses
-      });
-    }
+    // Note: Company model removed - license management is now handled via subscription.numLicenses
+    // No need to update a separate company entity
 
     return successResponse(res, {
       subscription,

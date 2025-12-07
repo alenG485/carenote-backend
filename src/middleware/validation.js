@@ -32,20 +32,9 @@ const userValidation = {
       .optional(),
     body('role')
       .optional()
-      .isIn(['user', 'company_admin', 'super_admin'])
+      .isIn(['user', 'super_admin'])
       .withMessage('Ugyldig rolle'),
-    body('companyName')
-      .optional()
-      .trim()
-      .isLength({ min: 2, max: 200 })
-      .withMessage('Virksomhedsnavn skal være mellem 2 og 200 tegn')
-      .custom((value, { req }) => {
-        // Company name is required if role is company_admin
-        if (req.body.role === 'company_admin' && !value) {
-          throw new Error('Virksomhedsnavn er påkrævet for virksomhedsadministrator registrering');
-        }
-        return true;
-      }),
+    // Note: companyName removed - workplace field is used for all users instead
     body('numLicenses')
       .optional()
       .isInt({ min: 1, max: 500 })
