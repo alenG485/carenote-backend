@@ -8,7 +8,7 @@ const pricingConfig = {
   currency: 'DKK',
   vatIncluded: false,
   vatRate: 0.25, // 25% VAT for Denmark (not calculated, just for reference)
-  trialDays: 15, // Free trial period in days
+  trialDays: 10, // Free trial period in days
   
   // Monthly pricing tiers
   monthly: {

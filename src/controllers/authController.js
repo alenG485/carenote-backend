@@ -78,7 +78,7 @@ const register = async (req, res) => {
     await user.save();
 
     // Create trial subscription for the user (only main users have subscriptions)
-    const trialEnd = trialEndDate ? new Date(trialEndDate) : new Date(Date.now() + 15 * 24 * 60 * 60 * 1000); // 15 days default
+    const trialEnd = trialEndDate ? new Date(trialEndDate) : new Date(Date.now() + 10 * 24 * 60 * 60 * 1000); // 10 days default
     
     // Calculate pricing based on number of licenses
     const billingInterval = billing_interval || 'monthly';

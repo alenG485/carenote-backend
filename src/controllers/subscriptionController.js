@@ -66,7 +66,7 @@ const createSubscription = async (req, res) => {
     }
 
     // Calculate trial end date
-    const trialDays = trial_days || 15;
+    const trialDays = trial_days || 10;
     const trialEnd = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
 
     // Create subscription in database
