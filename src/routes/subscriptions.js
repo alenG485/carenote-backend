@@ -10,6 +10,13 @@ const { subscriptionValidation, paramValidation } = require('../middleware/valid
  */
 
 /**
+ * @route   GET /api/subscriptions/pricing
+ * @desc    Get pricing configuration (public)
+ * @access  Public
+ */
+router.get('/pricing', subscriptionController.getPricing);
+
+/**
  * @route   GET /api/subscriptions/current
  * @desc    Get current user's subscription
  * @access  Private

@@ -283,6 +283,20 @@ const getSubscriptionById = async (req, res) => {
   }
 };
 
+/**
+ * Get pricing configuration
+ * GET /api/subscriptions/pricing
+ */
+const getPricing = async (req, res) => {
+  try {
+    const { pricingConfig } = require('../config/pricing');
+    return successResponse(res, { pricing: pricingConfig }, 'Priser hentet succesfuldt');
+  } catch (error) {
+    console.error('Get pricing error:', error);
+    return errorResponse(res, 'Kunne ikke hente priser', 500);
+  }
+};
+
 module.exports = {
   getCurrentSubscription,
   createSubscription,
@@ -291,5 +305,6 @@ module.exports = {
   reactivateSubscription,
   extendSubscription,
   getAllSubscriptions,
-  getSubscriptionById
+  getSubscriptionById,
+  getPricing
 }; 
