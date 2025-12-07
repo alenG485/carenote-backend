@@ -69,7 +69,7 @@ const requireSuperAdmin = (req, res, next) => {
  * Check if user is company admin or super admin
  */
 const requireCompanyAdmin = (req, res, next) => {
-  if (req.user.role !== 'company_admin' && req.user.role !== 'super_admin') {
+  if (!req.user.is_company_admin && req.user.role !== 'super_admin') {
     return errorResponse(res, 'Company admin access required', 403);
   }
   next();
@@ -78,58 +78,75 @@ const requireCompanyAdmin = (req, res, next) => {
 /**
  * Check if user can access specific company data
  */
-const requireCompanyAccess = (companyIdParam = 'companyId') => {
-  return (req, res, next) => {
-    const companyId = req.params[companyIdParam];
+const requireCompanyAccess = (userIdParam = 'userId') => {
+  return async (req, res, next) => {
+    const User = require('../models/User');
+    const targetUserId = req.params[userIdParam];
     
     if (req.user.role === 'super_admin') {
-      // Super admin can access any company
+      // Super admin can access any user
       return next();
     }
     
-    if (req.user.role === 'company_admin' && req.user.company_id) {
-      if (req.user.company_id.toString() === companyId) {
-        return next();
-      }
+    // Check if target user is invited by current user (or is current user)
+    const targetUser = await User.findById(targetUserId);
+    if (!targetUser) {
+      return errorResponse(res, 'User not found', 404);
     }
     
-    return errorResponse(res, 'Access denied to this company', 403);
+    if (targetUser.invited_by && targetUser.invited_by.toString() === req.user._id.toString()) {
+      return next();
+    }
+    
+    if (targetUser._id.toString() === req.user._id.toString()) {
+      return next();
+    }
+    
+    return errorResponse(res, 'Access denied to this user', 403);
   };
 };
 
 /**
  * Check subscription access
+ * - If user is company admin (is_company_admin: true), check their own subscription
+ * - If user is invited (invited_by exists), check the subscription of the user who invited them
  */
 const requireActiveSubscription = async (req, res, next) => {
   try {
-    
     let subscription;
+    let subscriptionOwnerId;
     
-    if (req.user.role === 'user' && !!req.user.invited_by) {
-      // Company user - check company subscription
-      subscription = await Subscription.findOne({
-        user_id: req.user.invited_by,
-        status: { $in: ['trialing', 'active'] }
-      });
+    if (req.user.is_company_admin) {
+      // Company admin - check their own subscription
+      subscriptionOwnerId = req.user._id;
+    } else if (req.user.invited_by) {
+      // Invited user - check the subscription of the user who invited them (main admin)
+      subscriptionOwnerId = req.user.invited_by;
     } else {
-      // Individual user - check individual subscription
-      subscription = await Subscription.findOne({
-        user_id: req.user._id,
-        status: { $in: ['trialing', 'active'] }
-      });
+      // Fallback: check own subscription (shouldn't happen, but handle gracefully)
+      subscriptionOwnerId = req.user._id;
     }
+
+    // Find subscription for the owner
+    subscription = await Subscription.findOne({
+      user_id: subscriptionOwnerId,
+      status: { $in: ['trialing', 'active'] }
+    });
 
     if (!subscription || !subscription.hasAccess()) {
       return errorResponse(res, 'Aktivt abonnement påkrævet', 402);
     }
 
     req.subscription = subscription;
+    req.subscriptionOwnerId = subscriptionOwnerId;
     next();
   } catch (error) {
     console.error('Subscription check error:', error);
     return errorResponse(res, 'Abonnementet kunne ikke bekræftes', 500);
   }
 };
+
+
 
 module.exports = {
   authenticate,

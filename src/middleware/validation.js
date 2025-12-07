@@ -46,10 +46,14 @@ const userValidation = {
         }
         return true;
       }),
-    body('plan_name')
+    body('numLicenses')
       .optional()
-      .isIn(['individual', 'clinic-small', 'clinic-medium', 'clinic-large'])
-      .withMessage('Plan navn skal være en af: individual, clinic-small, clinic-medium, clinic-large'),
+      .isInt({ min: 1, max: 500 })
+      .withMessage('Antal licenser skal være mellem 1 og 500'),
+    body('billing_interval')
+      .optional()
+      .isIn(['monthly', 'yearly'])
+      .withMessage('Faktureringsinterval skal være månedlig eller årlig'),
     body('trialEndDate')
       .optional()
       .isISO8601()
@@ -209,14 +213,10 @@ const leadValidation = {
 // Subscription validation rules
 const subscriptionValidation = {
   create: [
-    body('plan_name')
+    body('numLicenses')
       .optional()
-      .isIn(['individual', 'clinic-small', 'clinic-medium', 'clinic-large'])
-      .withMessage('Plan navn skal være en af: individual, clinic-small, clinic-medium, clinic-large'),
-    body('billing_amount')
-      .optional()
-      .isFloat({ min: 0 })
-      .withMessage('Faktureringsbeløb skal være et positivt tal'),
+      .isInt({ min: 1, max: 500 })
+      .withMessage('Antal licenser skal være mellem 1 og 500'),
     body('billing_interval')
       .optional()
       .isIn(['monthly', 'yearly'])
@@ -228,14 +228,10 @@ const subscriptionValidation = {
   ],
 
   update: [
-    body('plan_name')
+    body('numLicenses')
       .optional()
-      .isIn(['individual', 'clinic-small', 'clinic-medium', 'clinic-large'])
-      .withMessage('Plan navn skal være en af: individual, clinic-small, clinic-medium, clinic-large'),
-    body('billing_amount')
-      .optional()
-      .isFloat({ min: 0 })
-      .withMessage('Faktureringsbeløb skal være et positivt tal'),
+      .isInt({ min: 1, max: 500 })
+      .withMessage('Antal licenser skal være mellem 1 og 500'),
     body('billing_interval')
       .optional()
       .isIn(['monthly', 'yearly'])
@@ -296,14 +292,9 @@ const companyValidation = {
       .isLength({ min: 2, max: 100 })
       .withMessage('Navn skal være mellem 2 og 100 tegn'),
     body('specialty')
+      .optional(),
+    body('phone')
       .optional()
-      .isIn([
-        'general', 'cardiology', 'dermatology', 'endocrinology', 'gastroenterology',
-        'hematology', 'infectious_disease', 'nephrology', 'neurology', 'oncology',
-        'pulmonology', 'rheumatology', 'psychiatry', 'orthopedics', 'ophthalmology',
-        'otolaryngology', 'urology', 'gynecology', 'pediatrics', 'geriatrics'
-      ])
-      .withMessage('Ugyldig specialitet')
   ]
 };
 

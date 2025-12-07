@@ -3,10 +3,10 @@ const bcrypt = require('bcryptjs');
 const { validationResult } = require('express-validator');
 const crypto = require('crypto');
 const User = require('../models/User');
-const Company = require('../models/Company');
 const Subscription = require('../models/Subscription');
 const emailService = require('../services/emailService');
 const { successResponse, errorResponse } = require('../utils/responses');
+const { calculatePrice, getTierLabel, getMaxLicensesForTier } = require('../config/pricing');
 
 /**
  * Authentication Controller
@@ -43,7 +43,7 @@ const register = async (req, res) => {
       return errorResponse(res, 'Validation failed', 400, errors.array());
     }
 
-    const { email, password, name, specialty, phone, workplace, journalSystem, role, companyName, maxUsers, trialEndDate, plan_name } = req.body;
+    const { email, password, name, specialty, phone, workplace, journalSystem, role, numLicenses, trialEndDate, billing_interval } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findOne({ email });
@@ -54,6 +54,10 @@ const register = async (req, res) => {
     // Generate email verification token
     const verificationToken = crypto.randomBytes(32).toString('hex');
 
+    // All registered users are company admins (main users) and can invite others
+    // This includes both individual (1+ tier) and clinic (3+, 5+, 10+ tier) users
+    const licenseCount = numLicenses || 1;
+    
     // Create new user
     const userData = {
       email,
@@ -61,9 +65,11 @@ const register = async (req, res) => {
       name,
       specialty: specialty || 'general',
       phone,
-      workplace,
+      workplace, // Company name / workplace for all users
       journalSystem: journalSystem || 'none',
-      role: role || 'user', // Default to user role
+      role: role || 'user', // Always 'user' or 'super_admin', no 'company_admin' role
+      is_company_admin: true, // All main users are company admins (can invite users)
+      invited_by: null, // Main user, not invited
       email_verified: false,
       verification_token: verificationToken
     };
@@ -71,55 +77,32 @@ const register = async (req, res) => {
     const user = new User(userData);
     await user.save();
 
-    // If user is registering as company admin, create company
-    let company = null;
-    if (role === 'company_admin') {
-      if (!companyName) {
-        return errorResponse(res, 'Virksomhedsnavn er påkrævet for virksomhedsadministrator registrering', 400);
-      }
-
-      // Check if company name already exists
-      const existingCompany = await Company.findOne({ name: companyName });
-      if (existingCompany) {
-        return errorResponse(res, 'Virksomhed med dette navn findes allerede', 400);
-      }
-
-      // Create company
-      company = new Company({
-        name: companyName,
-        created_by: user._id,
-        max_users: maxUsers,
-        current_user_count: 1 // Include the creator
-      });
-
-      await company.save();
-
-      // Link user to company
-      user.company_id = company._id;
-      await user.save();
-    }
-
-    // Create trial subscription for the user
+    // Create trial subscription for the user (only main users have subscriptions)
     const trialEnd = trialEndDate ? new Date(trialEndDate) : new Date(Date.now() + 15 * 24 * 60 * 60 * 1000); // 15 days default
     
-    // Set billing amount based on plan
-    const billingAmounts = {
-      'individual': 599,
-      'clinic-small': 599,
-      'clinic-medium': 550,
-      'clinic-large': 525
-    };
+    // Calculate pricing based on number of licenses
+    const billingInterval = billing_interval || 'monthly';
+    const pricing = calculatePrice(licenseCount, billingInterval);
+    
+    if (!pricing) {
+      return errorResponse(res, 'Ugyldigt antal licenser eller faktureringsinterval', 400);
+    }
+    
+    const tierLabel = getTierLabel(pricing.tier.minLicenses);
+    const maxLicensesForTier = getMaxLicensesForTier(pricing.tier.minLicenses, licenseCount);
     
     const subscription = new Subscription({
       user_id: user._id,
-      plan_name: plan_name || 'individual',
+      numLicenses: maxLicensesForTier, // Store tier max capacity, not actual user count
+      pricePerLicense: pricing.pricePerLicense,
+      pricing_tier: tierLabel,
       status: 'active',
       is_trial: true,
       current_period_start: new Date(),
       current_period_end: trialEnd,
-      billing_amount: billingAmounts[plan_name || 'individual'],
+      billing_amount: pricing.totalPrice,
       billing_currency: 'DKK',
-      billing_interval: 'monthly'
+      billing_interval: billingInterval
     });
 
     await subscription.save();
@@ -158,23 +141,15 @@ const register = async (req, res) => {
       message: 'Registrering gennemført. Tjek venligst din e-mail for at verificere din konto.'
     };
 
-    // Include company info if created
-    if (company) {
-      response.company = {
-        id: company._id,
-        name: company.name,
-        max_users: company.max_users,
-        current_user_count: company.current_user_count
-      };
-    }
-
     // Include subscription info
     response.subscription = {
       id: subscription._id,
       status: subscription.status,
       is_trial: subscription.is_trial,
       current_period_end: subscription.current_period_end,
-      plan_name: subscription.plan_name,
+      numLicenses: subscription.numLicenses,
+      pricePerLicense: subscription.pricePerLicense,
+      pricing_tier: subscription.pricing_tier,
       billing_amount: subscription.billing_amount,
       billing_interval: subscription.billing_interval
     };
@@ -223,13 +198,12 @@ const login = async (req, res) => {
     // Generate tokens
     const { accessToken, refreshToken } = generateTokens(user._id);
 
-    // Get user with company info if applicable
-    const userWithCompany = await User.findById(user._id)
-      .populate('company_id', 'name max_users current_user_count')
+    // Get user without password
+    const userResponse = await User.findById(user._id)
       .select('-password');
 
     return successResponse(res, {
-      user: userWithCompany.toJSON(),
+      user: userResponse.toJSON(),
       tokens: {
         access: accessToken,
         refresh: refreshToken
@@ -249,7 +223,6 @@ const login = async (req, res) => {
 const getProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user._id)
-      .populate('company_id', 'name max_users current_user_count')
       .select('-password');
 
     if (!user) {
@@ -283,6 +256,8 @@ const updateProfile = async (req, res) => {
     }
 
     // Update fields
+    const workplaceChanged = workplace !== undefined && workplace !== user.workplace;
+    
     if (name) user.name = name;
     if (specialty) user.specialty = specialty;
     if (phone !== undefined) user.phone = phone;
@@ -291,8 +266,15 @@ const updateProfile = async (req, res) => {
 
     await user.save();
 
+    // If main user (company admin) changes workplace, sync to all invited users
+    if (workplaceChanged && user.is_company_admin) {
+      await User.updateMany(
+        { invited_by: user._id },
+        { workplace: user.workplace }
+      );
+    }
+
     const updatedUser = await User.findById(user._id)
-      .populate('company_id', 'name max_users current_user_count')
       .select('-password');
 
     return successResponse(res, { user: updatedUser }, 'Profil opdateret succesfuldt');
@@ -355,6 +337,12 @@ const forgotPassword = async (req, res) => {
     }
 
     const user = await User.findOne({ email });
+
+
+    // If user doesn't exist, still return success (security: don't reveal if email exists)
+    if (!user) {
+      return successResponse(res, null, 'Hvis e-mailen findes, vil et nulstillingslink blive sendt');
+    }
 
     // Generate secure reset token
     const resetToken = crypto.randomBytes(32).toString('hex');
@@ -562,10 +550,10 @@ const verifyInvitation = async (req, res) => {
       return errorResponse(res, 'Invitation has expired', 400);
     }
 
-    // Get company info
-    const company = await Company.findById(user.company_id);
-    if (!company) {
-      return errorResponse(res, 'Virksomhed ikke fundet', 404);
+    // Get main user (who invited this user)
+    const mainUser = await User.findById(user.invited_by);
+    if (!mainUser) {
+      return errorResponse(res, 'Hovedbruger ikke fundet', 404);
     }
 
     const invitationData = {
@@ -574,8 +562,7 @@ const verifyInvitation = async (req, res) => {
       specialty: user.specialty,
       phone: user.phone,
       company: {
-        id: company._id,
-        name: company.name
+        name: mainUser.workplace || 'Klinik'
       }
     };
 
@@ -622,10 +609,10 @@ const acceptInvitation = async (req, res) => {
     user.invitation_token = null; // Clear the invitation token
     await user.save();
 
-    // Get company info
-    const company = await Company.findById(user.company_id);
-    if (!company) {
-      return errorResponse(res, 'Virksomhed ikke fundet', 404);
+    // Get main user (who invited this user)
+    const mainUser = await User.findById(user.invited_by);
+    if (!mainUser) {
+      return errorResponse(res, 'Hovedbruger ikke fundet', 404);
     }
 
     // Generate tokens
@@ -644,18 +631,11 @@ const acceptInvitation = async (req, res) => {
         access: accessToken,
         refresh: refreshToken
       },
-      message: 'Konto aktiveret succesfuldt'
+      message: 'Konto aktiveret succesfuldt',
+      company: {
+        name: mainUser.workplace || 'Klinik'
+      }
     };
-
-    // Include company info
-    if (company) {
-      response.company = {
-        id: company._id,
-        name: company.name,
-        max_users: company.max_users,
-        current_user_count: company.current_user_count
-      };
-    }
 
     return successResponse(res, response, 'Invitation accepteret succesfuldt');
   } catch (error) {

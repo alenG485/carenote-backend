@@ -141,6 +141,12 @@ function getPricingTiers(interval = 'monthly') {
 
 /**
  * Calculate total price for a number of licenses
+ * Tier ranges work as follows:
+ * - 1-2 licenses → 1+ tier pricing
+ * - 3-4 licenses → 3+ tier pricing
+ * - 5-9 licenses → 5+ tier pricing
+ * - 10+ licenses → 10+ tier pricing
+ * 
  * @param {number} numLicenses - Number of licenses
  * @param {string} interval - 'monthly' or 'yearly'
  * @returns {object|null} Object with tier info and total price
@@ -150,16 +156,20 @@ function calculatePrice(numLicenses, interval = 'monthly') {
   if (!intervalConfig) return null;
   
   // Find the appropriate tier based on number of licenses
+  // Tiers are ranges: 1+ (1-2), 3+ (3-4), 5+ (5-9), 10+ (10+)
+  // We find the highest tier where numLicenses >= tier.minLicenses
   const applicableTier = intervalConfig.tiers
     .slice()
-    .reverse() // Start from highest tier
+    .reverse() // Start from highest tier (10+, then 5+, then 3+, then 1+)
     .find(tier => numLicenses >= tier.minLicenses);
   
   if (!applicableTier) return null;
   
   const pricePerLicense = applicableTier.pricePerLicense;
+  // For yearly, calculate based on actual number of licenses, not just tier minimum
+  // yearlyPrice in config is for reference (price for minimum licenses in tier)
   const totalPrice = interval === 'yearly' 
-    ? applicableTier.yearlyPrice 
+    ? pricePerLicense * numLicenses * 12
     : pricePerLicense * numLicenses;
   
   return {
@@ -171,10 +181,37 @@ function calculatePrice(numLicenses, interval = 'monthly') {
   };
 }
 
+/**
+ * Get tier label from minimum licenses
+ * @param {number} minLicenses - Minimum licenses for the tier
+ * @returns {string} Tier label ('1+', '3+', '5+', '10+')
+ */
+function getTierLabel(minLicenses) {
+  if (minLicenses >= 10) return '10+';
+  if (minLicenses >= 5) return '5+';
+  if (minLicenses >= 3) return '3+';
+  return '1+';
+}
+
+/**
+ * Get the maximum capacity for a tier
+ * @param {number} tierMinLicenses - Minimum licenses for the tier
+ * @param {number} actualCount - Actual number of users/licenses (used for 10+ tier)
+ * @returns {number} Maximum licenses for the tier
+ */
+function getMaxLicensesForTier(tierMinLicenses, actualCount) {
+  if (tierMinLicenses >= 10) return actualCount; // 10+ tier: use actual count (unlimited)
+  if (tierMinLicenses >= 5) return 9; // 5+ tier: max 9 licenses
+  if (tierMinLicenses >= 3) return 4; // 3+ tier: max 4 licenses
+  return 2; // 1+ tier: max 2 licenses
+}
+
 module.exports = {
   pricingConfig,
   getPricingTier,
   getPricingTiers,
-  calculatePrice
+  calculatePrice,
+  getTierLabel,
+  getMaxLicensesForTier
 };
 

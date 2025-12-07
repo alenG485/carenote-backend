@@ -2,6 +2,7 @@ const { validationResult } = require('express-validator');
 const Subscription = require('../models/Subscription');
 const User = require('../models/User');
 const { successResponse, errorResponse } = require('../utils/responses');
+const { calculatePrice, getTierLabel } = require('../config/pricing');
 
 /**
  * Subscription Controller
@@ -41,13 +42,27 @@ const createSubscription = async (req, res) => {
       return errorResponse(res, 'Validering fejlede', 400, errors.array());
     }
 
-    const { plan_name, billing_amount, billing_interval, trial_days } = req.body;
+    const { numLicenses, billing_interval, trial_days } = req.body;
 
     // Check if user already has subscription
     const existingSubscription = await Subscription.findOne({ user_id: req.user._id });
 
     if (existingSubscription) {
       return errorResponse(res, 'Abonnement findes allerede', 400);
+    }
+
+    // Validate numLicenses
+    const licenseCount = numLicenses || 1;
+    if (licenseCount < 1) {
+      return errorResponse(res, 'Antal licenser skal være mindst 1', 400);
+    }
+
+    // Calculate pricing
+    const billingInterval = billing_interval || 'monthly';
+    const pricing = calculatePrice(licenseCount, billingInterval);
+    
+    if (!pricing) {
+      return errorResponse(res, 'Ugyldigt antal licenser eller faktureringsinterval', 400);
     }
 
     // Calculate trial end date
@@ -57,14 +72,16 @@ const createSubscription = async (req, res) => {
     // Create subscription in database
     const subscription = new Subscription({
       user_id: req.user._id,
-      plan_name: plan_name || 'individual',
+      numLicenses: licenseCount,
+      pricePerLicense: pricing.pricePerLicense,
+      pricing_tier: getTierLabel(pricing.tier.minLicenses),
       status: 'active',
       is_trial: true,
       current_period_start: new Date(),
       current_period_end: trialEnd,
-      billing_amount: billing_amount || 599,
+      billing_amount: pricing.totalPrice,
       billing_currency: 'DKK',
-      billing_interval: billing_interval || 'monthly'
+      billing_interval: billingInterval
     });
 
     const savedSubscription = await subscription.save();
@@ -96,7 +113,7 @@ const updateSubscription = async (req, res) => {
     }
 
     const { id } = req.params;
-    const { plan_name, billing_amount, billing_interval, status, notes } = req.body;
+    const { numLicenses, billing_interval, status, notes } = req.body;
 
     const subscription = await Subscription.findById(id);
     if (!subscription) {
@@ -108,9 +125,25 @@ const updateSubscription = async (req, res) => {
       return errorResponse(res, 'Ikke autoriseret til at opdatere dette abonnement', 403);
     }
 
-    // Update fields
-    if (plan_name) subscription.plan_name = plan_name;
-    if (billing_amount) subscription.billing_amount = billing_amount;
+    // If numLicenses is being updated, recalculate pricing
+    if (numLicenses && numLicenses !== subscription.numLicenses) {
+      const billingInterval = billing_interval || subscription.billing_interval;
+      const pricing = calculatePrice(numLicenses, billingInterval);
+      
+      if (!pricing) {
+        return errorResponse(res, 'Ugyldigt antal licenser', 400);
+      }
+
+      subscription.numLicenses = numLicenses;
+      subscription.pricePerLicense = pricing.pricePerLicense;
+      subscription.pricing_tier = getTierLabel(pricing.tier.minLicenses);
+      subscription.billing_amount = pricing.totalPrice;
+      
+      // Note: No need to update company max_users anymore
+      // License count is managed via subscription.numLicenses
+    }
+
+    // Update other fields
     if (billing_interval) subscription.billing_interval = billing_interval;
     if (status) subscription.status = status;
     if (notes !== undefined) subscription.notes = notes;
@@ -284,6 +317,74 @@ const getSubscriptionById = async (req, res) => {
 };
 
 /**
+ * Upgrade licenses for a subscription
+ * PUT /api/subscriptions/:id/licenses
+ */
+const upgradeLicenses = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { numLicenses } = req.body;
+
+    if (!numLicenses || numLicenses < 1) {
+      return errorResponse(res, 'Antal licenser skal være mindst 1', 400);
+    }
+
+    const subscription = await Subscription.findById(id);
+    if (!subscription) {
+      return errorResponse(res, 'Abonnement ikke fundet', 404);
+    }
+
+    // Check if user owns this subscription or is admin
+    if (subscription.user_id.toString() !== req.user._id.toString() && req.user.role !== 'super_admin') {
+      return errorResponse(res, 'Ikke autoriseret til at opdatere dette abonnement', 403);
+    }
+
+    // Calculate new pricing
+    const pricing = calculatePrice(numLicenses, subscription.billing_interval);
+    
+    if (!pricing) {
+      return errorResponse(res, 'Ugyldigt antal licenser', 400);
+    }
+
+    // Store old values for response
+    const oldLicenses = subscription.numLicenses;
+    const oldPrice = subscription.billing_amount;
+
+    // Update subscription
+    subscription.numLicenses = numLicenses;
+    subscription.pricePerLicense = pricing.pricePerLicense;
+    subscription.pricing_tier = getTierLabel(pricing.tier.minLicenses);
+    subscription.billing_amount = pricing.totalPrice;
+
+    await subscription.save();
+
+    // Update company max_users if user has a company
+    const user = await User.findById(subscription.user_id).populate('company_id');
+    if (user && user.company_id) {
+      await Company.findByIdAndUpdate(user.company_id._id, {
+        max_users: numLicenses
+      });
+    }
+
+    return successResponse(res, {
+      subscription,
+      upgradeInfo: {
+        oldLicenses,
+        newLicenses: numLicenses,
+        oldPrice,
+        newPrice: pricing.totalPrice,
+        priceDifference: pricing.totalPrice - oldPrice,
+        tier: subscription.pricing_tier
+      }
+    }, 'Licenser opgraderet succesfuldt');
+
+  } catch (error) {
+    console.error('Upgrade licenses error:', error);
+    return errorResponse(res, error.message || 'Kunne ikke opgradere licenser', 500);
+  }
+};
+
+/**
  * Get pricing configuration
  * GET /api/subscriptions/pricing
  */
@@ -306,5 +407,6 @@ module.exports = {
   extendSubscription,
   getAllSubscriptions,
   getSubscriptionById,
+  upgradeLicenses,
   getPricing
 }; 

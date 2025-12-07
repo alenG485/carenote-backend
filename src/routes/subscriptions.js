@@ -98,4 +98,15 @@ router.post('/:id/extend',
   subscriptionController.extendSubscription
 );
 
+/**
+ * @route   PUT /api/subscriptions/:id/licenses
+ * @desc    Upgrade licenses for subscription
+ * @access  Private
+ */
+router.put('/:id/licenses', 
+  authenticate,
+  paramValidation.mongoId('id'),
+  subscriptionController.upgradeLicenses
+);
+
 module.exports = router; 

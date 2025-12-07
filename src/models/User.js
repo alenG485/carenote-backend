@@ -3,10 +3,10 @@ const bcrypt = require('bcryptjs');
 
 /**
  * User Model
- * Handles 3-level access system:
- * 1. Normal User (role: 'user')
- * 2. Company Admin (role: 'company_admin')
- * 3. Super Admin (role: 'super_admin')
+ * Simplified user model without Company:
+ * - Individual users: workplace (their own), is_company_admin: false, invited_by: null
+ * - Clinic main user: workplace (company name), is_company_admin: true, invited_by: null, has subscription
+ * - Clinic invited users: workplace (same as main), is_company_admin: false, invited_by: main_user_id, no subscription
  */
 
 const userSchema = new mongoose.Schema({
@@ -49,19 +49,18 @@ const userSchema = new mongoose.Schema({
   // Role & Permission System
   role: {
     type: String,
-    enum: ['user', 'company_admin', 'super_admin'],
+    enum: ['user', 'super_admin'],
     default: 'user'
   },
   
-  // Company Relationship
-  company_id: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Company',
-    default: null
+  // Company Admin status (true for clinic main user)
+  is_company_admin: {
+    type: Boolean,
+    default: false
   },
   
-  // Company Admin status (for backward compatibility)
-  is_company_admin: {
+  // Permission to invite users (future feature)
+  can_invite: {
     type: Boolean,
     default: false
   },
@@ -123,8 +122,10 @@ const userSchema = new mongoose.Schema({
 });
 
 // Indexes for performance (email already indexed via unique: true)
-userSchema.index({ company_id: 1 });
+userSchema.index({ invited_by: 1 });
+userSchema.index({ is_company_admin: 1 });
 userSchema.index({ role: 1 });
+userSchema.index({ workplace: 1 });
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {
@@ -149,15 +150,8 @@ userSchema.pre('save', function(next) {
   next();
 });
 
-// Sync role and is_company_admin fields
-userSchema.pre('save', function(next) {
-  if (this.role === 'company_admin') {
-    this.is_company_admin = true;
-  } else if (this.role === 'user') {
-    this.is_company_admin = false;
-  }
-  next();
-});
+// Note: is_company_admin is set explicitly during registration/updates
+// It's not automatically synced from role anymore
 
 // Instance method to check password
 userSchema.methods.comparePassword = async function(candidatePassword) {

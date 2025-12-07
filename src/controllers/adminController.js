@@ -1,10 +1,10 @@
 const { validationResult } = require('express-validator');
 const User = require('../models/User');
 const Subscription = require('../models/Subscription');
-const Company = require('../models/Company');
 const Lead = require('../models/Lead');
 const { successResponse, errorResponse } = require('../utils/responses');
 const emailService = require('../services/emailService');
+const { calculatePrice, getTierLabel } = require('../config/pricing');
 
 /**
  * Admin Controller
@@ -23,7 +23,6 @@ const getAllUsers = async (req, res) => {
 
     // Exclude super admin users
     const users = await User.find({ role: { $ne: 'super_admin' } })
-      .populate('company_id', 'name')
       .populate('subscription_id')
       .sort({ created_at: -1 })
       .skip(skip)
@@ -38,15 +37,18 @@ const getAllUsers = async (req, res) => {
       email: user.email,
       name: user.name,
       role: user.role,
+      is_company_admin: user.is_company_admin || false,
       is_active: user.is_active,
       email_verified: user.email_verified,
       created_at: user.created_at,
-      company_name: user.company_id?.name || null,
+      company_name: user.is_company_admin ? user.workplace : null,
       specialty: user.specialty,
       workplace: user.workplace,
       subscription: user.subscription_id ? {
         id: user.subscription_id._id,
-        plan_name: user.subscription_id.plan_name,
+        numLicenses: user.subscription_id.numLicenses,
+        pricePerLicense: user.subscription_id.pricePerLicense,
+        pricing_tier: user.subscription_id.pricing_tier,
         status: user.subscription_id.status,
         is_trial: user.subscription_id.is_trial,
         current_period_start: user.subscription_id.current_period_start,
@@ -86,7 +88,8 @@ const getAnalytics = async (req, res) => {
       is_active: true 
     });
     const companyAdminUsers = await User.countDocuments({ 
-      role: 'company_admin' 
+      is_company_admin: true,
+      role: { $ne: 'super_admin' }
     });
     
 
@@ -123,7 +126,7 @@ const getAnalytics = async (req, res) => {
 };
 
 /**
- * Get all companies with pagination
+ * Get all companies (clinic main users) with pagination
  * GET /api/admin/companies
  */
 const getAllCompanies = async (req, res) => {
@@ -132,28 +135,39 @@ const getAllCompanies = async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    const companies = await Company.find()
+    // Get all company admins (main users)
+    const companyAdmins = await User.find({ 
+      is_company_admin: true,
+      role: { $ne: 'super_admin' }
+    })
       .sort({ created_at: -1 })
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .select('email name workplace created_at is_active');
 
-    const totalCompanies = await Company.countDocuments();
+    const totalCompanies = await User.countDocuments({ 
+      is_company_admin: true,
+      role: { $ne: 'super_admin' }
+    });
     const totalPages = Math.ceil(totalCompanies / limit);
 
-    // Get user count for each company
+    // Get user count for each company (count invited users)
     const companiesWithUserCount = await Promise.all(
-      companies.map(async (company) => {
+      companyAdmins.map(async (admin) => {
         const userCount = await User.countDocuments({ 
-          company_id: company._id,
-          role: { $ne: 'super_admin' }
+          $or: [
+            { invited_by: admin._id },
+            { _id: admin._id }
+          ]
         });
         
         return {
-          id: company._id,
-          name: company.name,
-          email: company.email,
-          is_active: company.is_active,
-          created_at: company.created_at,
+          id: admin._id,
+          name: admin.workplace || 'Klinik',
+          email: admin.email,
+          admin_name: admin.name,
+          is_active: admin.is_active,
+          created_at: admin.created_at,
           user_count: userCount
         };
       })
@@ -480,10 +494,10 @@ const generateInvoiceHTML = (invoiceData) => {
 const markSubscription = async (req, res) => {
   try {
     const { userId } = req.params;
-    const { access_date, expiry_date, plan_name, billing_amount, billing_interval, status } = req.body;
+    const { access_date, expiry_date, numLicenses, billing_amount, billing_interval, status } = req.body;
 
-    if (!access_date || !expiry_date || !plan_name || !billing_amount || !billing_interval || !status) {
-      return errorResponse(res, 'Adgangsdato, udløbsdato, plan navn, faktureringsbeløb, faktureringsinterval og status er påkrævet', 400);
+    if (!access_date || !expiry_date || !numLicenses || !billing_amount || !billing_interval || !status) {
+      return errorResponse(res, 'Adgangsdato, udløbsdato, antal licenser, faktureringsbeløb, faktureringsinterval og status er påkrævet', 400);
     }
 
     const user = await User.findById(userId);
@@ -504,21 +518,35 @@ const markSubscription = async (req, res) => {
     let subscription = await Subscription.findOne({ user_id: userId });
 
     if (subscription) {
+      // Calculate pricing based on licenses
+      const licenseCount = parseInt(numLicenses);
+      const billingInterval = billing_interval || 'monthly';
+      const pricing = calculatePrice(licenseCount, billingInterval);
+      
+      if (!pricing) {
+        return errorResponse(res, 'Ugyldigt antal licenser', 400);
+      }
+
       // Update existing subscription
-      subscription.plan_name = plan_name;
+      subscription.numLicenses = licenseCount;
+      subscription.pricePerLicense = pricing.pricePerLicense;
+      subscription.pricing_tier = getTierLabel(pricing.tier.minLicenses);
       subscription.status = status;
       subscription.is_trial = false;
       subscription.current_period_start = accessDate;
       subscription.current_period_end = expiryDate;
       subscription.billing_amount = parseFloat(billing_amount);
       subscription.billing_currency = 'DKK';
-      subscription.billing_interval = billing_interval;
+      subscription.billing_interval = billingInterval;
       subscription.updated_at = currentDate;
     } else{
       return errorResponse(res, 'User does not have a subscription', 400);
     }
 
     await subscription.save();
+
+    // Note: No need to update company max_users anymore
+    // License count is managed via subscription.numLicenses
 
     // Update user's subscription reference
     user.subscription_id = subscription._id;
@@ -527,7 +555,9 @@ const markSubscription = async (req, res) => {
     return successResponse(res, {
       subscription: {
         id: subscription._id,
-        plan_name: subscription.plan_name,
+        numLicenses: subscription.numLicenses,
+        pricePerLicense: subscription.pricePerLicense,
+        pricing_tier: subscription.pricing_tier,
         status: subscription.status,
         current_period_start: subscription.current_period_start,
         current_period_end: subscription.current_period_end,
@@ -588,7 +618,6 @@ const getUserDetails = async (req, res) => {
     const { userId } = req.params;
 
     const user = await User.findById(userId)
-      .populate('company_id', 'name')
       .populate('subscription_id')
       .select('-password');
 
@@ -609,12 +638,14 @@ const getUserDetails = async (req, res) => {
       is_active: user.is_active,
       email_verified: user.email_verified,
       created_at: user.created_at,
-      company_name: user.company_id?.name || null,
+      company_name: user.is_company_admin ? user.workplace : null,
       specialty: user.specialty,
       workplace: user.workplace,
       subscription: user.subscription_id ? {
         id: user.subscription_id._id,
-        plan_name: user.subscription_id.plan_name,
+        numLicenses: user.subscription_id.numLicenses,
+        pricePerLicense: user.subscription_id.pricePerLicense,
+        pricing_tier: user.subscription_id.pricing_tier,
         status: user.subscription_id.status,
         is_trial: user.subscription_id.is_trial,
         current_period_start: user.subscription_id.current_period_start,

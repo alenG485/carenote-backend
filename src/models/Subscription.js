@@ -14,11 +14,21 @@ const subscriptionSchema = new mongoose.Schema({
     required: true
   },
   
-  // Manual Subscription Details
-  plan_name: {
-    type: String,
+  // License-based Subscription Details
+  numLicenses: {
+    type: Number,
     required: true,
-    enum: ['individual', 'clinic-small', 'clinic-medium', 'clinic-large', 'super_admin']
+    min: 1
+  },
+  pricePerLicense: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  pricing_tier: {
+    type: String,
+    enum: ['1+', '3+', '5+', '10+'],
+    required: true
   },
   
   // Subscription Status
@@ -106,6 +116,7 @@ subscriptionSchema.index({ user_id: 1 });
 subscriptionSchema.index({ status: 1 });
 subscriptionSchema.index({ is_trial: 1 });
 subscriptionSchema.index({ current_period_end: 1 });
+subscriptionSchema.index({ numLicenses: 1 });
 
 // Validation: user_id is required
 subscriptionSchema.pre('validate', function(next) {
