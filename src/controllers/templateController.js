@@ -26,28 +26,15 @@ const generateTemplate = async (req, res) => {
       outputLanguage
     } = req.body;
 
-    // Verify session access (user owns session OR is company admin of session owner)
-    const User = require('../models/User');
+    // Find session and verify user owns it
     const session = await Session.findById(session_id);
     
     if (!session) {
       return errorResponse(res, 'Session ikke fundet', 404);
     }
 
-    // Check access: user owns session OR is company admin and session owner was invited by them
-    let hasAccess = false;
-    
-    if (session.user_id.toString() === req.user._id.toString()) {
-      hasAccess = true;
-    } else if (req.user.is_company_admin) {
-      const sessionOwner = await User.findById(session.user_id).select('_id invited_by');
-      if (sessionOwner && sessionOwner.invited_by && 
-          sessionOwner.invited_by.toString() === req.user._id.toString()) {
-        hasAccess = true;
-      }
-    }
-
-    if (!hasAccess && req.user.role !== 'super_admin') {
+    // User can only generate templates for their own sessions
+    if (session.user_id.toString() !== req.user._id.toString() && req.user.role !== 'super_admin') {
       return errorResponse(res, 'Adgang nægtet til denne session', 403);
     }
 
@@ -57,14 +44,14 @@ const generateTemplate = async (req, res) => {
       type,
       outputLanguage
     );
-    // Generate title based on template type and session
+    
+    // Generate title based on template type
     const templateTitle = type === 'soap' ? 'SOAP Note' : 'Brief Clinical Note';
 
     // Create or update template in database
-    // Use session owner's user_id (not req.user._id) so templates are associated with session owner
     const template = await Template.getOrCreateTemplate(
       session._id,
-      session.user_id, // Use session owner's user_id
+      req.user._id, // Use current user's ID
       type,
       templateData.templateKey,
       templateTitle,
@@ -98,9 +85,8 @@ const getSessionTemplates = async (req, res) => {
     // Session is already loaded and access verified by requireSessionAccess middleware
     const session = req.session;
 
-    // Get templates for this session - use session owner's user_id
-    // This allows company admins to see templates from sessions they have access to
-    const templates = await Template.getTemplatesForSession(session._id, session.user_id);
+    // User can only see their own templates
+    const templates = await Template.getTemplatesForSession(session._id, req.user._id);
 
     return successResponse(res, {
       templates: templates,
@@ -120,7 +106,6 @@ const getSessionTemplates = async (req, res) => {
 const regenerateTemplate = async (req, res) => {
   try {
     const { id } = req.params;
-    const User = require('../models/User');
 
     const template = await Template.findById(id).populate('session_id');
 
@@ -132,20 +117,8 @@ const regenerateTemplate = async (req, res) => {
       return errorResponse(res, 'Skabelon session ikke fundet', 404);
     }
 
-    // Check access: user owns template OR is company admin and session owner was invited by them
-    let hasAccess = false;
-    
-    if (template.user_id.toString() === req.user._id.toString()) {
-      hasAccess = true;
-    } else if (req.user.is_company_admin) {
-      const sessionOwner = await User.findById(template.session_id.user_id).select('_id invited_by');
-      if (sessionOwner && sessionOwner.invited_by && 
-          sessionOwner.invited_by.toString() === req.user._id.toString()) {
-        hasAccess = true;
-      }
-    }
-
-    if (!hasAccess && req.user.role !== 'super_admin') {
+    // User can only regenerate their own templates
+    if (template.user_id.toString() !== req.user._id.toString() && req.user.role !== 'super_admin') {
       return errorResponse(res, 'Adgang nægtet til denne skabelon', 403);
     }
 

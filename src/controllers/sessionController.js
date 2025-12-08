@@ -258,34 +258,13 @@ const getUserSessions = async (req, res) => {
 
     let query = {};
     
-    // Handle different user roles
+    // Super admin can see all sessions or filter by user_id
     if (req.user.role === 'super_admin') {
-      // Super admin can see all sessions
       if (user_id) {
         query.user_id = user_id;
-      }
-    } else if (req.user.is_company_admin) {
-      // Company admin can see sessions from users they invited (plus their own)
-      if (user_id) {
-        // Verify the user is either the company admin or was invited by them
-        const targetUser = await User.findById(user_id);
-        if (!targetUser) {
-          return errorResponse(res, 'Bruger ikke fundet', 404);
-        }
-        // Check if target user is the company admin or was invited by them
-        if (targetUser._id.toString() !== req.user._id.toString() && 
-            (!targetUser.invited_by || targetUser.invited_by.toString() !== req.user._id.toString())) {
-          return errorResponse(res, 'Adgang nægtet til denne brugers sessions', 403);
-        }
-        query.user_id = user_id;
-      } else {
-        // Get all users in the company (main user + invited users)
-        const invitedUsers = await User.find({ invited_by: req.user._id }).select('_id');
-        const userIds = [req.user._id, ...invitedUsers.map(user => user._id)];
-        query.user_id = { $in: userIds };
       }
     } else {
-      // Regular user can only see their own sessions
+      // Regular users can only see their own sessions
       query.user_id = req.user._id;
     }
     
@@ -338,98 +317,6 @@ const getUserSessions = async (req, res) => {
 };
 
 /**
- * Get company users and their recent sessions (for company admins)
- * GET /api/sessions/company
- */
-const getCompanySessions = async (req, res) => {
-  try {
-    const { limit = 50, days = 7 } = req.query;
-
-    // Only company admins and super admins can access this
-    if (!req.user.is_company_admin && req.user.role !== 'super_admin') {
-      return errorResponse(res, 'Virksomhedsadministrator adgang påkrævet', 403);
-    }
-
-    let mainUserId = req.user._id;
-    
-    // Super admin can specify user_id to see sessions for a specific company admin
-    if (req.user.role === 'super_admin' && req.query.user_id) {
-      mainUserId = req.query.user_id;
-    }
-
-    // Calculate date filter
-    const daysAgo = new Date();
-    daysAgo.setDate(daysAgo.getDate() - parseInt(days));
-    daysAgo.setHours(0, 0, 0, 0);
-
-    // Get main user
-    const mainUser = await User.findById(mainUserId)
-      .select('_id name email specialty role')
-      .lean();
-    
-    if (!mainUser) {
-      return errorResponse(res, 'Bruger ikke fundet', 404);
-    }
-
-    // Get all users invited by this main user (including the main user)
-    const invitedUsers = await User.find({ invited_by: mainUserId })
-      .select('_id name email specialty role')
-      .lean();
-
-    const companyUsers = [mainUser, ...invitedUsers];
-    const userIds = companyUsers.map(user => user._id);
-
-    // Get sessions for all company users
-    const sessions = await Session.find({
-      user_id: { $in: userIds },
-      created_at: { $gte: daysAgo },
-      deleted: false
-    })
-      .sort({ created_at: -1 })
-      .limit(parseInt(limit))
-      .select('corti_interaction_id status session_title started_at ended_at created_at user_id')
-      .populate('user_id', 'name email specialty')
-      .lean();
-
-    // Group sessions by user
-    const userSessions = {};
-    companyUsers.forEach(user => {
-      userSessions[user._id] = {
-        user: user,
-        sessions: [],
-        total_sessions: 0,
-        total_facts: 0 // Will be calculated from Corti when needed
-      };
-    });
-
-    // Populate sessions for each user
-    sessions.forEach(session => {
-      const userId = session.user_id._id;
-      if (userSessions[userId]) {
-        userSessions[userId].sessions.push(session);
-        userSessions[userId].total_sessions++;
-        // Facts count will be fetched from Corti when needed
-      }
-    });
-
-    // Convert to array and sort by total sessions
-    const companyData = Object.values(userSessions)
-      .sort((a, b) => b.total_sessions - a.total_sessions);
-
-    return successResponse(res, {
-      company_users: companyData,
-      total_users: companyUsers.length,
-      total_sessions: sessions.length,
-      date_range: `${days} days`
-    }, 'Virksomheds sessions hentet succesfuldt');
-
-  } catch (error) {
-    console.error('Get company sessions error:', error);
-    return errorResponse(res, 'Kunne ikke hente virksomheds sessions', 500);
-  }
-};
-
-/**
  * Get recent sessions (last 2 days only)
  * GET /api/sessions/recent
  */
@@ -447,34 +334,13 @@ const getRecentSessions = async (req, res) => {
       deleted: false
     };
 
-    // Handle different user roles
+    // Super admin can see all sessions or filter by user_id
     if (req.user.role === 'super_admin') {
-      // Super admin can see all sessions
       if (user_id) {
         query.user_id = user_id;
-      }
-    } else if (req.user.is_company_admin) {
-      // Company admin can see sessions from users they invited (plus their own)
-      if (user_id) {
-        // Verify the user is either the company admin or was invited by them
-        const targetUser = await User.findById(user_id);
-        if (!targetUser) {
-          return errorResponse(res, 'Bruger ikke fundet', 404);
-        }
-        // Check if target user is the company admin or was invited by them
-        if (targetUser._id.toString() !== req.user._id.toString() && 
-            (!targetUser.invited_by || targetUser.invited_by.toString() !== req.user._id.toString())) {
-          return errorResponse(res, 'Adgang nægtet til denne brugers sessions', 403);
-        }
-        query.user_id = user_id;
-      } else {
-        // Get all users in the company (main user + invited users)
-        const invitedUsers = await User.find({ invited_by: req.user._id }).select('_id');
-        const userIds = [req.user._id, ...invitedUsers.map(user => user._id)];
-        query.user_id = { $in: userIds };
       }
     } else {
-      // Regular user can only see their own sessions
+      // Regular users can only see their own sessions
       query.user_id = req.user._id;
     }
 
@@ -582,7 +448,6 @@ module.exports = {
   endSession,
   getUserSessions,
   getRecentSessions,
-  getCompanySessions,
   deleteSession,
   getFactGroups
 }; 

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const sessionController = require('../controllers/sessionController');
-const { authenticate, requireActiveSubscription, requireCompanyAdmin, requireSessionAccess } = require('../middleware/auth');
+const { authenticate, requireActiveSubscription, requireSessionAccess } = require('../middleware/auth');
 const { sessionValidation, paramValidation, queryValidation } = require('../middleware/validation');
 
 /**
@@ -19,17 +19,6 @@ router.post('/start',
   requireActiveSubscription,
   sessionValidation.start, 
   sessionController.startSession
-);
-
-/**
- * @route   GET /api/sessions/company
- * @desc    Get company users and their sessions (company admins only)
- * @access  Private (Company Admin or Super Admin)
- */
-router.get('/company', 
-  authenticate, 
-  requireCompanyAdmin,
-  sessionController.getCompanySessions
 );
 
 /**
