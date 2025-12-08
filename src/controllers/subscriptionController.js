@@ -69,17 +69,22 @@ const createSubscription = async (req, res) => {
     const trialDays = trial_days || 10;
     const trialEnd = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
 
+    // Determine tier max capacity
+    const tierLabel = getTierLabel(pricing.tier.minLicenses);
+    const { getMaxLicensesForTier } = require('../config/pricing');
+    const maxLicensesForTier = getMaxLicensesForTier(pricing.tier.minLicenses, licenseCount);
+
     // Create subscription in database
     const subscription = new Subscription({
       user_id: req.user._id,
-      numLicenses: licenseCount,
+      numLicenses: maxLicensesForTier, // Store tier max capacity
       pricePerLicense: pricing.pricePerLicense,
-      pricing_tier: getTierLabel(pricing.tier.minLicenses),
+      pricing_tier: tierLabel,
       status: 'active',
       is_trial: true,
       current_period_start: new Date(),
       current_period_end: trialEnd,
-      billing_amount: pricing.totalPrice,
+      billing_amount: pricing.totalPrice, // Billing based on actual users (respecting tier minimum)
       billing_currency: 'DKK',
       billing_interval: billingInterval
     });
@@ -134,10 +139,14 @@ const updateSubscription = async (req, res) => {
         return errorResponse(res, 'Ugyldigt antal licenser', 400);
       }
 
-      subscription.numLicenses = numLicenses;
+      const { getMaxLicensesForTier } = require('../config/pricing');
+      const tierLabel = getTierLabel(pricing.tier.minLicenses);
+      const maxLicensesForTier = getMaxLicensesForTier(pricing.tier.minLicenses, numLicenses);
+
+      subscription.numLicenses = maxLicensesForTier; // Store tier max capacity
       subscription.pricePerLicense = pricing.pricePerLicense;
-      subscription.pricing_tier = getTierLabel(pricing.tier.minLicenses);
-      subscription.billing_amount = pricing.totalPrice;
+      subscription.pricing_tier = tierLabel;
+      subscription.billing_amount = pricing.totalPrice; // Billing based on actual users (respecting tier minimum)
       
       // Note: No need to update company max_users anymore
       // License count is managed via subscription.numLicenses
@@ -350,11 +359,16 @@ const upgradeLicenses = async (req, res) => {
     const oldLicenses = subscription.numLicenses;
     const oldPrice = subscription.billing_amount;
 
+    // Determine tier max capacity
+    const { getMaxLicensesForTier } = require('../config/pricing');
+    const tierLabel = getTierLabel(pricing.tier.minLicenses);
+    const maxLicensesForTier = getMaxLicensesForTier(pricing.tier.minLicenses, numLicenses);
+
     // Update subscription
-    subscription.numLicenses = numLicenses;
+    subscription.numLicenses = maxLicensesForTier; // Store tier max capacity
     subscription.pricePerLicense = pricing.pricePerLicense;
-    subscription.pricing_tier = getTierLabel(pricing.tier.minLicenses);
-    subscription.billing_amount = pricing.totalPrice;
+    subscription.pricing_tier = tierLabel;
+    subscription.billing_amount = pricing.totalPrice; // Billing based on actual users (respecting tier minimum)
 
     await subscription.save();
 

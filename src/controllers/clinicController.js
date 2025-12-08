@@ -6,6 +6,58 @@ const { errorResponse, successResponse } = require('../utils/responses');
 const { calculatePrice, getTierLabel, getMaxLicensesForTier } = require('../config/pricing');
 
 /**
+ * Helper function to recalculate and update subscription based on user count
+ * Returns tier change info if tier changed
+ * @param {Object} subscription - The subscription document to update
+ * @param {number} userCount - The new total user count
+ * @returns {Object} - { tierChanged: boolean, changeInfo: Object|null }
+ */
+const recalculateSubscription = async (subscription, userCount) => {
+  // Store previous values BEFORE updating
+  const previousLicenses = subscription.numLicenses;
+  const previousPricePerLicense = subscription.pricePerLicense;
+  const previousTier = subscription.pricing_tier;
+
+  // Calculate new pricing based on user count
+  const newPricing = calculatePrice(userCount, subscription.billing_interval);
+  
+  if (!newPricing) {
+    return { tierChanged: false, changeInfo: null, error: 'Kunne ikke beregne priser for det ønskede antal licenser' };
+  }
+
+  // Determine the tier and max licenses for that tier
+  const tierLabel = getTierLabel(newPricing.tier.minLicenses);
+  const maxLicensesForTier = getMaxLicensesForTier(newPricing.tier.minLicenses, userCount);
+
+  // Check if tier changed
+  const tierChanged = previousTier !== tierLabel;
+
+  // Update subscription
+  subscription.numLicenses = maxLicensesForTier;
+  subscription.pricePerLicense = newPricing.pricePerLicense;
+  subscription.pricing_tier = tierLabel;
+  subscription.billing_amount = newPricing.totalPrice;
+  await subscription.save();
+
+  // Return change info if tier changed
+  let changeInfo = null;
+  if (tierChanged) {
+    changeInfo = {
+      previousLicenses: previousLicenses,
+      newLicenses: maxLicensesForTier,
+      actualUsers: userCount,
+      billingLicenses: newPricing.billingLicenses,
+      previousTier: previousTier,
+      newTier: tierLabel,
+      previousPricePerLicense: previousPricePerLicense,
+      newPricePerLicense: newPricing.pricePerLicense
+    };
+  }
+
+  return { tierChanged, changeInfo, error: null };
+};
+
+/**
  * Get clinic data including users and subscription info
  * Returns all users invited by the main user (company admin)
  */
@@ -123,7 +175,6 @@ const inviteUser = async (req, res) => {
       return errorResponse(res, 'Bruger findes allerede', 400);
     }
 
-    // Check license availability and auto-upgrade if needed
     // Count all users invited by this main user (including main user)
     const userCount = await User.countDocuments({ 
       $or: [
@@ -133,48 +184,15 @@ const inviteUser = async (req, res) => {
     });
     const newTotal = userCount + 1; // +1 for the new invite
 
-    let subscriptionUpgraded = false;
-    let upgradeInfo = null;
-
-    // Auto-upgrade subscription if needed
-    if (newTotal > subscription.numLicenses) {
-      // Calculate what tier they'd need
-      const newPricing = calculatePrice(newTotal, subscription.billing_interval);
-      
-      if (!newPricing) {
-        return errorResponse(res, 'Kunne ikke beregne priser for det ønskede antal licenser', 500);
-      }
-
-      // Store previous values BEFORE updating
-      const previousLicenses = subscription.numLicenses;
-      const previousPrice = subscription.billing_amount;
-      const previousTier = subscription.pricing_tier;
-
-      // Determine the tier and max licenses for that tier
-      const tierLabel = getTierLabel(newPricing.tier.minLicenses);
-      const maxLicensesForTier = getMaxLicensesForTier(newPricing.tier.minLicenses, newTotal);
-
-      // Auto-upgrade the subscription
-      // numLicenses represents the maximum capacity of the tier, not the actual user count
-      subscription.numLicenses = maxLicensesForTier;
-      subscription.pricePerLicense = newPricing.pricePerLicense;
-      subscription.pricing_tier = tierLabel;
-      // Calculate billing amount based on actual number of users, not tier max
-      subscription.billing_amount = newPricing.totalPrice;
-      await subscription.save();
-
-      subscriptionUpgraded = true;
-      upgradeInfo = {
-        previousLicenses: previousLicenses,
-        newLicenses: maxLicensesForTier, // Show tier max capacity
-        actualUsers: newTotal, // Actual number of users
-        previousTier: previousTier,
-        newTier: tierLabel,
-        previousPrice: previousPrice,
-        newPrice: newPricing.totalPrice,
-        priceDifference: newPricing.totalPrice - previousPrice
-      };
+    // Recalculate subscription based on new user count
+    const { tierChanged, changeInfo, error } = await recalculateSubscription(subscription, newTotal);
+    
+    if (error) {
+      return errorResponse(res, error, 500);
     }
+
+    const subscriptionUpgraded = tierChanged;
+    const upgradeInfo = changeInfo;
 
     // Create invitation token
     const invitationToken = require('crypto').randomBytes(32).toString('hex');
@@ -276,7 +294,6 @@ const updateUserStatus = async (req, res) => {
       if (hasPendingInvitation) {
         // For pending invitations, delete the user completely (they haven't accepted yet)
         await User.findByIdAndDelete(userId);
-        return successResponse(res, { message: 'Invitation annulleret succesfuldt' }, 'Invitation annulleret succesfuldt');
       } else {
         // For active users, just remove them from company (keep user record in case they have data)
         const updateData = {
@@ -286,8 +303,42 @@ const updateUserStatus = async (req, res) => {
           can_invite: false
         };
         await User.findByIdAndUpdate(userId, updateData);
-        return successResponse(res, { message: 'Bruger fjernet fra klinikken succesfuldt' }, 'Bruger fjernet succesfuldt');
       }
+
+      // Recalculate subscription pricing based on remaining users
+      const subscription = await Subscription.findById(currentUser.subscription_id);
+      let subscriptionDowngraded = false;
+      let downgradeInfo = null;
+
+      if (subscription) {
+        // Count remaining users (including main user)
+        const remainingUserCount = await User.countDocuments({ 
+          $or: [
+            { invited_by: currentUser._id },
+            { _id: currentUser._id }
+          ]
+        });
+
+        // Recalculate subscription based on remaining user count
+        const { tierChanged, changeInfo } = await recalculateSubscription(subscription, remainingUserCount);
+        
+        if (tierChanged && changeInfo) {
+          subscriptionDowngraded = true;
+          downgradeInfo = changeInfo;
+        }
+      }
+
+      // Return response with downgrade info if subscription was downgraded
+      const responseData = { 
+        message: 'Bruger fjernet succesfuldt',
+        subscriptionDowngraded: subscriptionDowngraded
+      };
+      
+      if (subscriptionDowngraded && downgradeInfo) {
+        responseData.downgradeInfo = downgradeInfo;
+      }
+
+      return successResponse(res, responseData, 'Bruger fjernet succesfuldt');
     } else {
       // Activate or deactivate
       const updateData = {

@@ -142,12 +142,16 @@ function getPricingTiers(interval = 'monthly') {
 /**
  * Calculate total price for a number of licenses
  * Tier ranges work as follows:
- * - 1-2 licenses → 1+ tier pricing
- * - 3-4 licenses → 3+ tier pricing
- * - 5-9 licenses → 5+ tier pricing
- * - 10+ licenses → 10+ tier pricing
+ * - 1-2 licenses → 1+ tier pricing (minimum 1 license)
+ * - 3-4 licenses → 3+ tier pricing (minimum 3 licenses)
+ * - 5-9 licenses → 5+ tier pricing (minimum 5 licenses)
+ * - 10+ licenses → 10+ tier pricing (minimum 10 licenses)
  * 
- * @param {number} numLicenses - Number of licenses
+ * Billing logic:
+ * - Charge for minimum tier licenses even if fewer users exist
+ * - Charge for actual number of users if more than tier minimum
+ * 
+ * @param {number} numLicenses - Number of licenses (actual user count)
  * @param {string} interval - 'monthly' or 'yearly'
  * @returns {object|null} Object with tier info and total price
  */
@@ -166,15 +170,20 @@ function calculatePrice(numLicenses, interval = 'monthly') {
   if (!applicableTier) return null;
   
   const pricePerLicense = applicableTier.pricePerLicense;
-  // For yearly, calculate based on actual number of licenses, not just tier minimum
-  // yearlyPrice in config is for reference (price for minimum licenses in tier)
+  
+  // Calculate billing licenses: use tier minimum or actual count, whichever is higher
+  // This ensures minimum billing per tier
+  const billingLicenses = Math.max(applicableTier.minLicenses, numLicenses);
+  
+  // Calculate total price based on billing licenses
   const totalPrice = interval === 'yearly' 
-    ? pricePerLicense * numLicenses * 12
-    : pricePerLicense * numLicenses;
+    ? pricePerLicense * billingLicenses * 12
+    : pricePerLicense * billingLicenses;
   
   return {
     tier: applicableTier,
-    numLicenses,
+    numLicenses, // Actual number of licenses/users
+    billingLicenses, // Number of licenses to bill for (min or actual)
     pricePerLicense,
     totalPrice,
     interval

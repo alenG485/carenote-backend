@@ -528,15 +528,21 @@ const markSubscription = async (req, res) => {
         return errorResponse(res, 'Ugyldigt antal licenser', 400);
       }
 
+      // Determine tier max capacity
+      const tierLabel = getTierLabel(pricing.tier.minLicenses);
+      const { getMaxLicensesForTier } = require('../config/pricing');
+      const maxLicensesForTier = getMaxLicensesForTier(pricing.tier.minLicenses, licenseCount);
+
       // Update existing subscription
-      subscription.numLicenses = licenseCount;
+      subscription.numLicenses = maxLicensesForTier; // Store tier max capacity
       subscription.pricePerLicense = pricing.pricePerLicense;
-      subscription.pricing_tier = getTierLabel(pricing.tier.minLicenses);
+      subscription.pricing_tier = tierLabel;
       subscription.status = status;
       subscription.is_trial = false;
       subscription.current_period_start = accessDate;
       subscription.current_period_end = expiryDate;
-      subscription.billing_amount = parseFloat(billing_amount);
+      // Use calculated billing amount (respects tier minimum), but allow admin override if needed
+      subscription.billing_amount = parseFloat(billing_amount) || pricing.totalPrice;
       subscription.billing_currency = 'DKK';
       subscription.billing_interval = billingInterval;
       subscription.updated_at = currentDate;
