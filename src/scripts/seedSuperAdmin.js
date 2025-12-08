@@ -50,7 +50,9 @@ async function seedSuperAdmin() {
     // Create subscription for super admin
     const subscription = new Subscription({
       user_id: superAdmin._id,
-      plan_name: 'super_admin',
+      numLicenses: 1,
+      pricePerLicense: 0, // Free for super admin
+      pricing_tier: '1+',
       status: 'active',
       is_trial: false,
       current_period_start: new Date(),
