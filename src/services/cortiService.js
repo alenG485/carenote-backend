@@ -372,7 +372,6 @@ class CortiService {
         throw new Error(`Failed to list transcripts: ${response.status}`);
       }
 
-      console.log('Transcripts:', JSON.stringify(response.data, null, 2));
       return response.data;
     } catch (error) {
       throw new Error(`Failed to list transcripts from Corti: ${error.message}`);
