@@ -222,6 +222,9 @@ class CortiService {
       } else if (templateType === 'nursing-note') {
         templateKey = 'corti-nursing-note';
         templateName = 'Nursing Note';
+      } else if (templateType === 'referral') {
+        templateKey = 'corti-referral-c2f';
+        templateName = 'Referral Note';
       } else {
         templateKey = 'corti-brief-clinical-note';
         templateName = 'Brief Clinical Note';
@@ -253,8 +256,8 @@ class CortiService {
       
       // Format the template content
       let formattedContent = '';
-      if (templateType === 'soap' || templateType === 'nursing-note') {
-        // Format SOAP note and Nursing note sections (both have multiple sections)
+      if (templateType === 'soap' || templateType === 'nursing-note' || templateType === 'referral') {
+        // Format SOAP note, Nursing note, and Referral note sections (all have multiple sections)
         formattedContent = templateData.sections
           .sort((a, b) => a.sort - b.sort)
           .map(section => `${section.name}:\n${section.text}`)

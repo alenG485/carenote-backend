@@ -32,7 +32,7 @@ const templateSchema = new mongoose.Schema({
   // Template Type & Metadata
   type: {
     type: String,
-    enum: ['soap', 'brief-clinical-note', 'nursing-note'],
+    enum: ['soap', 'brief-clinical-note', 'nursing-note', 'referral'],
     required: true
   },
   template_key: {

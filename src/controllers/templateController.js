@@ -51,6 +51,8 @@ const generateTemplate = async (req, res) => {
       templateTitle = 'SOAP Note';
     } else if (type === 'nursing-note') {
       templateTitle = 'Nursing Note';
+    } else if (type === 'referral') {
+      templateTitle = 'Referral Note';
     } else {
       templateTitle = 'Brief Clinical Note';
     }

@@ -181,7 +181,7 @@ const templateValidation = {
       .withMessage('Gyldig session ID er påkrævet'),
     body('type')
       .optional()
-      .isIn(['soap', 'brief-clinical-note', 'nursing-note'])
+      .isIn(['soap', 'brief-clinical-note', 'nursing-note', 'referral'])
       .withMessage('Ugyldig skabelonstype')
   ],
   update: [
