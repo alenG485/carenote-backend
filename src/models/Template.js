@@ -61,6 +61,20 @@ const templateSchema = new mongoose.Schema({
   last_regenerated_at: {
     type: Date,
     default: null
+  },
+  
+  // Edit tracking
+  is_edited: {
+    type: Boolean,
+    default: false
+  },
+  original_content: {
+    type: String,
+    default: null
+  },
+  last_edited_at: {
+    type: Date,
+    default: null
   }
 }, {
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
@@ -78,6 +92,22 @@ templateSchema.methods.regenerate = function(newContent, newFacts) {
   this.facts_snapshot = newFacts;
   this.regenerated_count += 1;
   this.last_regenerated_at = new Date();
+  // Reset edit status when regenerated
+  this.is_edited = false;
+  this.original_content = newContent;
+  this.last_edited_at = null;
+  return this;
+};
+
+// Method to update template content (manual edit)
+templateSchema.methods.updateContent = function(newContent) {
+  // Store original content if this is the first edit
+  if (!this.is_edited && !this.original_content) {
+    this.original_content = this.content;
+  }
+  this.content = newContent;
+  this.is_edited = true;
+  this.last_edited_at = new Date();
   return this;
 };
 
@@ -104,7 +134,11 @@ templateSchema.statics.getOrCreateTemplate = function(sessionId, userId, type, t
       facts_snapshot: facts,
       output_language: outputLanguage,
       $inc: { regenerated_count: 1 },
-      last_regenerated_at: new Date()
+      last_regenerated_at: new Date(),
+      // Reset edit status when regenerated/created
+      is_edited: false,
+      original_content: content,
+      last_edited_at: null
     },
     {
       upsert: true,

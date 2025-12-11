@@ -45,4 +45,17 @@ router.post('/:id/regenerate',
   templateController.regenerateTemplate
 );
 
+/**
+ * @route   PUT /api/templates/:id
+ * @desc    Update template content (manual edit)
+ * @access  Private
+ */
+router.put('/:id', 
+  authenticate,
+  paramValidation.mongoId('id'),
+  templateValidation.update,
+  requireActiveSubscription,
+  templateController.updateTemplate
+);
+
 module.exports = router; 

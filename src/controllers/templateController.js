@@ -154,8 +154,48 @@ const regenerateTemplate = async (req, res) => {
   }
 };
 
+/**
+ * Update template content (manual edit)
+ * PUT /api/templates/:id
+ */
+const updateTemplate = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return errorResponse(res, 'Validation failed', 400, errors.array());
+    }
+
+    const { id } = req.params;
+    const { content } = req.body;
+
+    const template = await Template.findById(id);
+
+    if (!template) {
+      return errorResponse(res, 'Skabelon ikke fundet', 404);
+    }
+
+    // User can only update their own templates
+    if (template.user_id.toString() !== req.user._id.toString() && req.user.role !== 'super_admin') {
+      return errorResponse(res, 'Adgang nægtet til denne skabelon', 403);
+    }
+
+    // Update template content
+    template.updateContent(content);
+    await template.save();
+
+    return successResponse(res, {
+      template: template
+    }, 'Skabelon opdateret succesfuldt', 200);
+
+  } catch (error) {
+    console.error('Update template error:', error);
+    return errorResponse(res, error.message || 'Kunne ikke opdatere skabelon', 500);
+  }
+};
+
 module.exports = {
   generateTemplate,
   getSessionTemplates,
-  regenerateTemplate
+  regenerateTemplate,
+  updateTemplate
 }; 

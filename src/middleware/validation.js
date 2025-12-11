@@ -183,6 +183,13 @@ const templateValidation = {
       .optional()
       .isIn(['soap', 'brief-clinical-note', 'nursing-note'])
       .withMessage('Ugyldig skabelonstype')
+  ],
+  update: [
+    body('content')
+      .notEmpty()
+      .withMessage('Indhold er påkrævet')
+      .isLength({ min: 1, max: 50000 })
+      .withMessage('Indhold skal være mellem 1 og 50000 tegn')
   ]
 };
 
