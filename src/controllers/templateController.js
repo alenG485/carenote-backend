@@ -46,7 +46,14 @@ const generateTemplate = async (req, res) => {
     );
     
     // Generate title based on template type
-    const templateTitle = type === 'soap' ? 'SOAP Note' : 'Brief Clinical Note';
+    let templateTitle;
+    if (type === 'soap') {
+      templateTitle = 'SOAP Note';
+    } else if (type === 'nursing-note') {
+      templateTitle = 'Nursing Note';
+    } else {
+      templateTitle = 'Brief Clinical Note';
+    }
 
     // Create or update template in database
     const template = await Template.getOrCreateTemplate(

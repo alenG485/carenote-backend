@@ -215,8 +215,17 @@ class CortiService {
       const facts = await this.getFacts(interactionId);
       
       // Prepare template generation request
-      const templateKey = templateType === 'soap' ? 'corti-soap' : 'corti-brief-clinical-note';
-      const templateName = templateType === 'soap' ? 'SOAP Note' : 'Brief Clinical Note';
+      let templateKey, templateName;
+      if (templateType === 'soap') {
+        templateKey = 'corti-soap';
+        templateName = 'SOAP Note';
+      } else if (templateType === 'nursing-note') {
+        templateKey = 'corti-nursing-note';
+        templateName = 'Nursing Note';
+      } else {
+        templateKey = 'corti-brief-clinical-note';
+        templateName = 'Brief Clinical Note';
+      }
       
       const payload = {
         context: [{
@@ -244,8 +253,8 @@ class CortiService {
       
       // Format the template content
       let formattedContent = '';
-      if (templateType === 'soap') {
-        // Format SOAP note sections
+      if (templateType === 'soap' || templateType === 'nursing-note') {
+        // Format SOAP note and Nursing note sections (both have multiple sections)
         formattedContent = templateData.sections
           .sort((a, b) => a.sort - b.sort)
           .map(section => `${section.name}:\n${section.text}`)
