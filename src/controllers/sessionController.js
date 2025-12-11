@@ -438,6 +438,36 @@ const getFactGroups = async (req, res) => {
   }
 };
 
+/**
+ * Get session transcripts from Corti API
+ * GET /api/sessions/:sessionId/transcripts
+ * https://docs.corti.ai/api-reference/transcripts/list-transcripts
+ * Access control handled by requireSessionAccess middleware
+ */
+const getSessionTranscripts = async (req, res) => {
+  try {
+    // Session is already loaded and access verified by requireSessionAccess middleware
+    const session = req.session;
+
+    if (session.deleted) {
+      return errorResponse(res, 'Session er slettet', 404);
+    }
+
+    // Fetch transcripts from Corti API
+    const transcriptsData = await cortiService.listTranscripts(session.corti_interaction_id, true);
+
+    return successResponse(res, {
+      transcripts: transcriptsData.transcripts || [],
+      session_id: session._id,
+      interaction_id: session.corti_interaction_id
+    }, 'Transkripter hentet succesfuldt');
+
+  } catch (error) {
+    console.error('Get session transcripts error:', error);
+    return errorResponse(res, 'Kunne ikke hente session transkripter', 500);
+  }
+};
+
 module.exports = {
   startSession,
   getSession,
@@ -449,5 +479,6 @@ module.exports = {
   getUserSessions,
   getRecentSessions,
   deleteSession,
-  getFactGroups
+  getFactGroups,
+  getSessionTranscripts
 }; 

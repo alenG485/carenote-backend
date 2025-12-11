@@ -343,6 +343,39 @@ class CortiService {
       return `Clinical Note - ${new Date().toLocaleDateString()}`;
     }
   }
+
+  /**
+   * List transcripts for an interaction
+   * GET /interactions/{id}/transcripts/
+   * @param {string} interactionId - The Corti interaction ID
+   * @param {boolean} full - Whether to return full transcripts in listing
+   * @returns {Promise<Object>} List of transcripts
+   */
+  async listTranscripts(interactionId, full = false) {
+    try {
+      const token = await this.getAccessToken();
+      
+      // https://docs.corti.ai/api-reference/transcripts/list-transcripts
+      const url = `${this.apiBaseUrl}/interactions/${interactionId}/transcripts/${full ? '?full=true' : ''}`;
+      
+      const response = await axios.get(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Tenant-Name': this.tenantName
+        }
+      });
+
+      if (response.status !== 200) {
+        throw new Error(`Failed to list transcripts: ${response.status}`);
+      }
+
+      console.log('Transcripts:', JSON.stringify(response.data, null, 2));
+      return response.data;
+    } catch (error) {
+      throw new Error(`Failed to list transcripts from Corti: ${error.message}`);
+    }
+  }
+
 }
 
 module.exports = new CortiService(); 

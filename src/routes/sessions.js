@@ -139,4 +139,16 @@ router.delete('/:sessionId',
   sessionController.deleteSession
 );
 
+/**
+ * @route   GET /api/sessions/:sessionId/transcripts
+ * @desc    Get session transcripts from Corti API
+ * @access  Private (with session access control)
+ */
+router.get('/:sessionId/transcripts', 
+  authenticate,
+  paramValidation.mongoId('sessionId'),
+  requireSessionAccess('sessionId'),
+  sessionController.getSessionTranscripts
+);
+
 module.exports = router; 
