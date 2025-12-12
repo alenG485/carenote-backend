@@ -23,7 +23,7 @@ const generateTemplate = async (req, res) => {
     const { 
       session_id, 
       type = 'brief-clinical-note',
-      outputLanguage
+      outputLanguage = 'da'
     } = req.body;
 
     // Find session and verify user owns it
