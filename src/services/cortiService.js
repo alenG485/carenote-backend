@@ -248,19 +248,25 @@ class CortiService {
         }
       });
 
+
       if (response.status !== 200 && response.status !== 201) {
         throw new Error(`Failed to generate template: ${response.status}`);
       }
 
       const templateData = response.data;
-      
       // Format the template content
       let formattedContent = '';
-      if (templateType === 'soap' || templateType === 'nursing-note' || templateType === 'referral') {
-        // Format SOAP note, Nursing note, and Referral note sections (all have multiple sections)
+      if (templateType === 'soap' || templateType === 'nursing-note') {
+        // Format SOAP note and Nursing note sections (with section names)
         formattedContent = templateData.sections
           .sort((a, b) => a.sort - b.sort)
           .map(section => `${section.name}:\n${section.text}`)
+          .join('\n\n');
+      } else if (templateType === 'referral') {
+        // Format Referral note (only text, no section names)
+        formattedContent = templateData.sections
+          .sort((a, b) => a.sort - b.sort)
+          .map(section => section.text)
           .join('\n\n');
       } else {
         // Format Brief Clinical Note
