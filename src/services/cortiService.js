@@ -223,7 +223,7 @@ class CortiService {
         templateKey = 'corti-nursing-note';
         templateName = 'Nursing Note';
       } else if (templateType === 'referral') {
-        templateKey = 'corti-referral-c2f';
+        templateKey = 'corti-referral';
         templateName = 'Referral Note';
       } else {
         templateKey = 'corti-brief-clinical-note';
