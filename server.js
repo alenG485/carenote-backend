@@ -63,6 +63,7 @@ const corsOptions = {
       'http://localhost:5173',
       'https://carenote.dk',
       'https://www.carenote.dk',
+      'https://kind-ocean-03c048b03.7.azurestaticapps.net',
       process.env.FRONTEND_URL
     ].filter(Boolean);
     
